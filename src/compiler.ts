@@ -98,7 +98,7 @@ export class StcCompiler {
                 );
                 objFiles.push(objFile);
 
-                const miscArgs = (project.c251Misc || 'large').split(/\s+/).filter(Boolean);
+                const miscArgs = (project.c251Misc || 'xsmall').split(/\s+/).filter(Boolean);
                 const args = [
                     cFile,
                     ...miscArgs,

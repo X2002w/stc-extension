@@ -345,7 +345,7 @@ async function autoLoadProject(): Promise<void> {
                     outputDir: config.output?.name
                         ? path.join(rootPath, config.output.name)
                         : path.join(rootPath, 'output'),
-                    c251Misc: config.c251Misc || 'large',
+                    c251Misc: config.c251Misc || 'xsmall',
                     a251Misc: config.a251Misc || '',
                     l251Misc: config.linker
                         ? `RS(${config.linker.ramSize || 256}) PL(${config.linker.codeSize || 256})`

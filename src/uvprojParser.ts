@@ -132,6 +132,15 @@ export class UvprojParser {
                         projectDir
                     );
                     defines = this.parseCommaList(c251Define);
+
+                    // 提取 C251 优化设置: Optim(优化级别) + SizSpd(0=size, 1=speed)
+                    const optimLevel = this.getText(c251Node, 'Optim');
+                    const sizSpd = this.getText(c251Node, 'SizSpd');
+                    if (optimLevel) {
+                        const emphasis = sizSpd === '0' ? 'size' : 'speed';
+                        const optimFlag = `optimize(${optimLevel}, ${emphasis})`;
+                        c251Misc = optimFlag + (c251Misc ? ' ' + c251Misc : '');
+                    }
                 }
 
                 // A251 汇编器参数
@@ -155,9 +164,9 @@ export class UvprojParser {
                     const uSrcBin = this.getText(target251Misc, 'uSrcBin');
 
                     // MemoryModel → C251 编译参数（小写）
-                    // 0=small, 2=compact, 3=large, 4=xlarge (对应 xsmall)
+                    // C251 映射: 0=small, 2=compact, 3=xsmall, 4=large
                     const modelFlags: Record<string, string> = {
-                        '0': 'small', '2': 'compact', '3': 'large', '4': 'xsmall',
+                        '0': 'small', '2': 'compact', '3': 'xsmall', '4': 'large',
                     };
 
                     const flags: string[] = [];
@@ -170,6 +179,9 @@ export class UvprojParser {
                     if (uSrcBin === '0') {
                         flags.push('modbin');
                     }
+
+                    // intr2: C251 中断向量格式（Keil 默认为 C251 项目添加）
+                    flags.push('intr2');
 
                     const autoFlags = flags.join(' ');
                     c251Misc = autoFlags + (c251Misc ? ' ' + c251Misc : '');
@@ -191,10 +203,9 @@ export class UvprojParser {
                 }
             }
 
-            // 如果 C251Misc 为空，给安全的默认值（Keil 无法推导配置时用）
-            // SOURCE 模式是默认，不加 modbin 以兼容大多数 STC32G 库文件
+            // 如果 C251Misc 为空，给安全的默认值
             if (!c251Misc) {
-                c251Misc = 'large';
+                c251Misc = 'xsmall';
             }
 
             // === 5. 提取文件分组 ===
