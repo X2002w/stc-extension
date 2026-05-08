@@ -351,11 +351,88 @@ export class UvprojParser {
 
     private parseSemicolonList(str: string, baseDir: string): string[] {
         if (!str) return [];
-        return str
+        const rawPaths = str
             .split(';')
             .map((s) => s.trim())
-            .filter((s) => s.length > 0)
-            .map((s) => path.resolve(baseDir, s));
+            .filter((s) => s.length > 0);
+
+        const result: string[] = [];
+        for (const raw of rawPaths) {
+            const resolved = path.resolve(baseDir, raw);
+            if (fs.existsSync(resolved) && fs.statSync(resolved).isDirectory()) {
+                result.push(resolved);
+                continue;
+            }
+
+            // 目录不存在，尝试修正路径
+            const fixed = this.fixIncludePath(baseDir, raw);
+            if (fixed) {
+                result.push(fixed);
+            }
+            // 如果修正也失败，仍然加入原始路径（C251 会报错但不会漏掉）
+            else {
+                result.push(resolved);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * 尝试修正不存在的 include 路径
+     * 例如: ..\USER\inc (相对 uvproj 的 Project 上级) → .\USER\inc (就在 uvproj 同级)
+     */
+    private fixIncludePath(baseDir: string, rawPath: string): string | undefined {
+        // 把 rawPath 中的 ..\ 替换为 .\ 的各种组合，逐个尝试
+        const normalized = rawPath.replace(/\\/g, '/');
+        const segments = normalized.split('/');
+
+        // 方法1: 把开头的 .. 替换为 .
+        const altSegments = [...segments];
+        for (let i = 0; i < altSegments.length; i++) {
+            if (altSegments[i] === '..') {
+                altSegments[i] = '.';
+                const altPath = path.resolve(baseDir, altSegments.join(path.sep));
+                if (fs.existsSync(altPath) && fs.statSync(altPath).isDirectory()) {
+                    return altPath;
+                }
+                // 恢复，继续尝试下一个
+                altSegments[i] = '..';
+            }
+        }
+
+        // 方法2: 用路径最后一段名称在 baseDir 附近搜索同名目录
+        const lastSegment = segments[segments.length - 1];
+        if (lastSegment && lastSegment !== '.' && lastSegment !== '..') {
+            const found = this.searchDirRecursive(baseDir, lastSegment, 3);
+            if (found) {
+                return found;
+            }
+        }
+
+        return undefined;
+    }
+
+    /**
+     * 搜索同名目录
+     */
+    private searchDirRecursive(dir: string, targetName: string, maxDepth: number): string | undefined {
+        if (maxDepth <= 0) return undefined;
+        try {
+            const entries = fs.readdirSync(dir, { withFileTypes: true });
+            for (const entry of entries) {
+                if (!entry.isDirectory()) continue;
+                if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
+                const fullPath = path.join(dir, entry.name);
+                if (entry.name === targetName || entry.name.toLowerCase() === targetName.toLowerCase()) {
+                    return fullPath;
+                }
+                const found = this.searchDirRecursive(fullPath, targetName, maxDepth - 1);
+                if (found) return found;
+            }
+        } catch {
+            // 忽略无权限目录
+        }
+        return undefined;
     }
 
     private parseCommaList(str: string): string[] {
