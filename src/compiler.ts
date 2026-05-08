@@ -161,6 +161,7 @@ export class StcCompiler {
             }
 
             // 步骤3: 链接 (L251.EXE)
+            let linkFailed = false;
             if (objFiles.length > 0) {
                 // 生成链接控制文件
                 const linkFile = path.join(project.outputDir, 'project.lin');
@@ -181,20 +182,29 @@ export class StcCompiler {
                     this.outputChannel.append(result.stderr);
                 }
 
-                // 步骤4: 生成 HEX (OH251.EXE)
-                const omfFile = path.join(project.outputDir, project.name);
-                const hexFile = path.join(project.outputDir, project.name + '.hex');
+                if (result.exitCode >= 2) {
+                    this.outputChannel.appendLine(
+                        `[L251] 链接失败 (exit code: ${result.exitCode})`
+                    );
+                    linkFailed = true;
+                }
 
-                this.outputChannel.appendLine('[OH251] 生成 HEX...');
-                const ohResult = await this.execTool(
-                    this.toolPaths.get('OH251.EXE')!,
-                    [omfFile, `HEXFILE(${hexFile})`],
-                    workspaceRoot
-                );
-                allOutput += ohResult.stdout + '\n' + ohResult.stderr + '\n';
-                this.outputChannel.append(ohResult.stdout);
-                if (ohResult.stderr) {
-                    this.outputChannel.append(ohResult.stderr);
+                // 步骤4: 生成 HEX (OH251.EXE) — 仅在链接成功时执行
+                if (!linkFailed) {
+                    const omfFile = path.join(project.outputDir, project.name);
+                    const hexFile = path.join(project.outputDir, project.name + '.hex');
+
+                    this.outputChannel.appendLine('[OH251] 生成 HEX...');
+                    const ohResult = await this.execTool(
+                        this.toolPaths.get('OH251.EXE')!,
+                        [omfFile, `HEXFILE(${hexFile})`],
+                        workspaceRoot
+                    );
+                    allOutput += ohResult.stdout + '\n' + ohResult.stderr + '\n';
+                    this.outputChannel.append(ohResult.stdout);
+                    if (ohResult.stderr) {
+                        this.outputChannel.append(ohResult.stderr);
+                    }
                 }
             }
 
@@ -203,6 +213,12 @@ export class StcCompiler {
 
             const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
             const errorCount = this.countErrors(allOutput);
+            const warningCount = this.countWarnings(allOutput);
+
+            // 提取 L251 的程序大小信息和 OH251 的 HEX 创建信息
+            const programSize = this.extractProgramSize(allOutput);
+            const hexStatus = this.extractHexStatus(allOutput);
+
             if (errorCount > 0) {
                 this.updateStatus(`$(error) 编译失败 (${elapsed}s)`);
                 this.outputChannel.appendLine(
@@ -211,9 +227,17 @@ export class StcCompiler {
                 return false;
             } else {
                 this.updateStatus(`$(pass) 编译成功 (${elapsed}s)`);
+                // Keil 风格编译摘要
+                if (programSize) {
+                    this.outputChannel.appendLine(`\n${programSize}`);
+                }
+                if (hexStatus) {
+                    this.outputChannel.appendLine(hexStatus);
+                }
                 this.outputChannel.appendLine(
-                    `\n=== 编译成功，耗时 ${elapsed}s ===`
+                    `\n".\\${path.relative(workspaceRoot, path.join(project.outputDir, project.name))}" - ${errorCount} Error(s), ${warningCount} Warning(s).`
                 );
+                this.outputChannel.appendLine(`Build Time Elapsed:  ${elapsed}s`);
                 return true;
             }
         } catch (error) {
@@ -456,5 +480,22 @@ export class StcCompiler {
     private countErrors(output: string): number {
         const matches = output.match(/^\*\*\*\s+ERROR\s+/gim);
         return matches ? matches.length : 0;
+    }
+
+    private countWarnings(output: string): number {
+        const matches = output.match(/^\*\*\*\s+WARNING\s+/gim);
+        return matches ? matches.length : 0;
+    }
+
+    /** 从 L251 输出中提取程序大小信息 */
+    private extractProgramSize(output: string): string | undefined {
+        const match = output.match(/Program Size:\s*.+/i);
+        return match ? match[0].trim() : undefined;
+    }
+
+    /** 从 OH251 输出中提取 HEX 创建状态 */
+    private extractHexStatus(output: string): string | undefined {
+        const match = output.match(/creating hex file from\s*.+/i);
+        return match ? match[0].trim() : undefined;
     }
 }
