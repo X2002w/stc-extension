@@ -13,6 +13,8 @@ export class StcCompiler {
     private outputChannel: vscode.OutputChannel;
     private diagnosticParser: DiagnosticParser;
     private statusBarItem: vscode.StatusBarItem;
+    /** 缓存已找到的工具实际路径 (工具名 → 完整路径) */
+    private toolPaths: Map<string, string> = new Map();
 
     constructor() {
         this.outputChannel = vscode.window.createOutputChannel('STC Build');
@@ -101,7 +103,7 @@ export class StcCompiler {
                     `[C251] 编译 ${path.basename(cFile)}...`
                 );
                 const result = await this.execTool(
-                    path.join(toolchainPath, 'C251.EXE'),
+                    this.toolPaths.get('C251.EXE')!,
                     args,
                     workspaceRoot
                 );
@@ -136,7 +138,7 @@ export class StcCompiler {
                     `[A251] 汇编 ${path.basename(asmFile)}...`
                 );
                 const result = await this.execTool(
-                    path.join(toolchainPath, 'A251.EXE'),
+                    this.toolPaths.get('A251.EXE')!,
                     args,
                     workspaceRoot
                 );
@@ -163,7 +165,7 @@ export class StcCompiler {
 
                 this.outputChannel.appendLine('[L251] 链接...');
                 const result = await this.execTool(
-                    path.join(toolchainPath, 'L251.EXE'),
+                    this.toolPaths.get('L251.EXE')!,
                     ['@' + linkFile],
                     workspaceRoot
                 );
@@ -179,7 +181,7 @@ export class StcCompiler {
 
                 this.outputChannel.appendLine('[OH251] 生成 HEX...');
                 const ohResult = await this.execTool(
-                    path.join(toolchainPath, 'OH251.EXE'),
+                    this.toolPaths.get('OH251.EXE')!,
                     [omfFile, `HEXFILE(${hexFile})`],
                     workspaceRoot
                 );
@@ -226,18 +228,18 @@ export class StcCompiler {
             return;
         }
 
-        const c251 = path.join(toolchainPath, 'C251.EXE');
-        if (!fs.existsSync(c251)) {
-            vscode.window.showErrorMessage(`找不到 C251.EXE: ${c251}`);
+        if (!this.checkTools(toolchainPath)) {
             return;
         }
+
+        const c251Path = this.toolPaths.get('C251.EXE')!;
 
         this.outputChannel.clear();
         this.outputChannel.show(true);
         this.outputChannel.appendLine(`[C251] 编译 ${path.basename(filePath)}...`);
 
         const workspaceRoot = this.getWorkspaceRoot() || path.dirname(filePath);
-        const result = await this.execTool(c251, [filePath, 'DB', 'OE', 'MODC251'], workspaceRoot);
+        const result = await this.execTool(c251Path, [filePath, 'DB', 'OE', 'MODC251'], workspaceRoot);
 
         this.outputChannel.append(result.stdout);
         if (result.stderr) {
@@ -314,19 +316,76 @@ export class StcCompiler {
     private checkTools(toolchainPath: string): boolean {
         const tools = ['C251.EXE', 'A251.EXE', 'L251.EXE', 'OH251.EXE'];
         const missing: string[] = [];
+
+        this.toolPaths.clear();
+
         for (const tool of tools) {
-            const toolPath = path.join(toolchainPath, tool);
-            if (!fs.existsSync(toolPath)) {
-                missing.push(tool);
+            // 先在配置路径直接查找
+            const directPath = path.join(toolchainPath, tool);
+            if (fs.existsSync(directPath)) {
+                this.toolPaths.set(tool, directPath);
+                continue;
             }
+
+            // 递归搜索子目录（最多 3 层）
+            const found = this.searchToolRecursive(toolchainPath, tool, 3);
+            if (found) {
+                this.toolPaths.set(tool, found);
+                continue;
+            }
+
+            missing.push(tool);
         }
+
         if (missing.length > 0) {
             vscode.window.showErrorMessage(
-                `找不到以下工具: ${missing.join(', ')}\n请检查工具链路径: ${toolchainPath}`
+                `找不到以下工具: ${missing.join(', ')}\n搜索路径: ${toolchainPath}（含 3 层子目录）`
             );
             return false;
         }
+
+        // 输出找到的工具路径
+        this.outputChannel.appendLine('--- 工具链路径 ---');
+        for (const [tool, p] of this.toolPaths) {
+            this.outputChannel.appendLine(`${tool}: ${p}`);
+        }
+        this.outputChannel.appendLine('');
+
         return true;
+    }
+
+    /**
+     * 在目录下递归搜索指定名称的可执行文件
+     */
+    private searchToolRecursive(dir: string, exeName: string, maxDepth: number): string | undefined {
+        if (maxDepth <= 0 || !fs.existsSync(dir)) {
+            return undefined;
+        }
+        try {
+            const entries = fs.readdirSync(dir, { withFileTypes: true });
+            for (const entry of entries) {
+                const fullPath = path.join(dir, entry.name);
+                if (entry.isDirectory()) {
+                    if (entry.name.startsWith('.')) {
+                        continue;
+                    }
+                    const found = this.searchToolRecursive(fullPath, exeName, maxDepth - 1);
+                    if (found) {
+                        return found;
+                    }
+                } else if (entry.isFile()) {
+                    if (
+                        entry.name === exeName ||
+                        entry.name.toLowerCase() === exeName.toLowerCase()
+                    ) {
+                        return fullPath;
+                    }
+                }
+            }
+        } catch {
+            // 忽略无权限目录
+        }
+        return undefined;
     }
 
     /**
