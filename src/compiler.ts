@@ -110,9 +110,13 @@ export class StcCompiler {
                 if (result.stderr) {
                     this.outputChannel.append(result.stderr);
                 }
-                if (result.exitCode !== 0) {
+                if (result.exitCode >= 2) {
                     this.outputChannel.appendLine(
                         `[C251] 编译失败 (exit code: ${result.exitCode})`
+                    );
+                } else if (result.exitCode === 1) {
+                    this.outputChannel.appendLine(
+                        `[C251] 编译成功（有警告）`
                     );
                 }
             }
@@ -145,9 +149,13 @@ export class StcCompiler {
                 if (result.stderr) {
                     this.outputChannel.append(result.stderr);
                 }
-                if (result.exitCode !== 0) {
+                if (result.exitCode >= 2) {
                     this.outputChannel.appendLine(
                         `[A251] 汇编失败 (exit code: ${result.exitCode})`
+                    );
+                } else if (result.exitCode === 1) {
+                    this.outputChannel.appendLine(
+                        `[A251] 汇编成功（有警告）`
                     );
                 }
             }
@@ -237,7 +245,7 @@ export class StcCompiler {
         this.outputChannel.appendLine(`[C251] 编译 ${path.basename(filePath)}...`);
 
         const workspaceRoot = this.getWorkspaceRoot() || path.dirname(filePath);
-        const result = await this.execTool(c251Path, [filePath, 'DB', 'OE', 'MODC251'], workspaceRoot);
+        const result = await this.execTool(c251Path, [filePath, 'OPTIMIZE(8)'], workspaceRoot);
 
         this.outputChannel.append(result.stdout);
         if (result.stderr) {
@@ -246,8 +254,10 @@ export class StcCompiler {
 
         this.diagnosticParser.parse(result.stdout + '\n' + result.stderr, workspaceRoot);
 
-        if (result.exitCode === 0) {
-            this.outputChannel.appendLine('\n=== 编译通过 ===');
+        if (result.exitCode <= 1) {
+            this.outputChannel.appendLine(
+                result.exitCode === 0 ? '\n=== 编译通过 ===' : '\n=== 编译通过（有警告）==='
+            );
         } else {
             this.outputChannel.appendLine('\n=== 编译失败 ===');
         }
