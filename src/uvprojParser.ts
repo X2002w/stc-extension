@@ -114,12 +114,23 @@ export class UvprojParser {
                         const fileList = this.getAllNodes(filesNode, 'File');
                         if (fileList) {
                             for (const file of fileList) {
-                                let fileName = this.getText(file, 'FileName');
+                                let fileName = this.getText(file, 'FileName') || '';
                                 let filePath = this.getText(file, 'FilePath') || '';
+
                                 if (fileName) {
-                                    // 拼接完整路径
-                                    const fullPath = path.resolve(projectDir, filePath, fileName);
-                                    files.push(fullPath);
+                                    // 归一化分隔符
+                                    fileName = fileName.replace(/\\/g, '/');
+                                    filePath = filePath.replace(/\\/g, '/');
+
+                                    // 尝试多种策略解析文件的真实路径
+                                    const realPath = this.resolveFilePath(
+                                        projectDir,
+                                        filePath,
+                                        fileName
+                                    );
+                                    if (realPath) {
+                                        files.push(realPath);
+                                    }
                                 }
                             }
                         }
@@ -269,6 +280,113 @@ export class UvprojParser {
         }
 
         return {};
+    }
+
+    /**
+     * 解析文件真实路径（多种策略 + 文件存在性验证 + 回退搜索）
+     * @param projectDir uvproj 文件所在目录
+     * @param filePath uvproj 中的 FilePath 字段
+     * @param fileName uvproj 中的 FileName 字段
+     * @returns 文件在磁盘上的真实绝对路径，找不到返回 undefined
+     */
+    private resolveFilePath(
+        projectDir: string,
+        filePath: string,
+        fileName: string
+    ): string | undefined {
+        // 策略1: 标准化拼接 projectDir + filePath + fileName
+        const candidates: string[] = [];
+
+        // 去掉 filePath 首尾的引号和多余空格
+        filePath = filePath.trim().replace(/^["']|["']$/g, '');
+        fileName = fileName.trim().replace(/^["']|["']$/g, '');
+
+        // 如果 fileName 已经包含了路径分隔符，说明它自带相对路径
+        if (fileName.includes('/') || fileName.includes('\\')) {
+            candidates.push(path.resolve(projectDir, fileName));
+        } else {
+            // filePath + fileName 拼接
+            if (filePath) {
+                candidates.push(path.resolve(projectDir, filePath, fileName));
+                // 如果 filePath 是绝对路径
+                if (path.isAbsolute(filePath)) {
+                    candidates.push(path.resolve(filePath, fileName));
+                }
+            }
+            // 只用 fileName 在 projectDir 下
+            candidates.push(path.resolve(projectDir, fileName));
+        }
+
+        // 如果 filePath 非空，也尝试把 filePath 当作完整路径
+        if (filePath && !fileName.includes('/') && !fileName.includes('\\')) {
+            candidates.push(path.resolve(projectDir, filePath));
+            if (path.isAbsolute(filePath)) {
+                candidates.push(filePath);
+            }
+        }
+
+        // 去重
+        const unique = [...new Set(candidates.map((p) => path.normalize(p)))];
+
+        // 逐个验证文件是否存在
+        for (const fullPath of unique) {
+            if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
+                return fullPath;
+            }
+        }
+
+        // 策略2: 回退——在 projectDir 下递归搜索同名文件
+        const searchName = path.basename(fileName);
+        const found = this.searchFileRecursive(projectDir, searchName);
+        return found;
+    }
+
+    /**
+     * 在目录下递归搜索指定名称的文件
+     */
+    private searchFileRecursive(dir: string, targetName: string): string | undefined {
+        // 限制搜索深度，避免性能问题
+        return this._searchRecursive(dir, targetName, 5);
+    }
+
+    private _searchRecursive(
+        dir: string,
+        targetName: string,
+        maxDepth: number
+    ): string | undefined {
+        if (maxDepth <= 0) {
+            return undefined;
+        }
+        try {
+            const entries = fs.readdirSync(dir, { withFileTypes: true });
+            for (const entry of entries) {
+                const fullPath = path.join(dir, entry.name);
+                if (entry.isDirectory()) {
+                    if (
+                        entry.name.startsWith('.') ||
+                        entry.name === 'node_modules' ||
+                        entry.name === 'output' ||
+                        entry.name === 'build'
+                    ) {
+                        continue;
+                    }
+                    const found = this._searchRecursive(fullPath, targetName, maxDepth - 1);
+                    if (found) {
+                        return found;
+                    }
+                } else if (entry.isFile()) {
+                    if (
+                        entry.name === targetName ||
+                        entry.name.toLowerCase() === targetName.toLowerCase()
+                    ) {
+                        return fullPath;
+                    }
+                }
+            }
+        } catch {
+            // 忽略无权限目录
+        }
+        return undefined;
     }
 
     /**
