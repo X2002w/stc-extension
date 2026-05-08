@@ -98,7 +98,7 @@ export class StcCompiler {
                 );
                 objFiles.push(objFile);
 
-                const miscArgs = (project.c251Misc || 'large modbin').split(/\s+/).filter(Boolean);
+                const miscArgs = (project.c251Misc || 'large').split(/\s+/).filter(Boolean);
                 const args = [
                     cFile,
                     ...miscArgs,
@@ -202,7 +202,8 @@ export class StcCompiler {
 
                 // 步骤4: 生成 HEX (OH251.EXE) — 仅在链接成功时执行
                 if (!linkFailed) {
-                    const omfFile = path.join(project.outputDir, project.name);
+                    // L251 生成 .abs 文件，OH251 需要精确的文件名
+                    const omfFile = path.join(project.outputDir, project.name + '.abs');
                     const hexFile = path.join(project.outputDir, project.name + '.hex');
 
                     this.outputChannel.appendLine('[OH251] 生成 HEX...');

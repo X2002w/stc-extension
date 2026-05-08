@@ -152,20 +152,24 @@ export class UvprojParser {
                 const target251Misc = this.findNode(target251, 'Target251Misc');
                 if (target251Misc) {
                     const memoryModel = this.getText(target251Misc, 'MemoryModel');
-                    const romSize = this.getText(target251Misc, 'RomSize');
+                    const uSrcBin = this.getText(target251Misc, 'uSrcBin');
 
                     // MemoryModel → C251 编译参数（小写）
-                    // 0=small, 2=compact, 3=large, 4=xlarge
+                    // 0=small, 2=compact, 3=large, 4=xlarge (对应 xsmall)
                     const modelFlags: Record<string, string> = {
-                        '0': 'small', '2': 'compact', '3': 'large', '4': 'large',
+                        '0': 'small', '2': 'compact', '3': 'large', '4': 'xsmall',
                     };
 
                     const flags: string[] = [];
                     if (memoryModel && modelFlags[memoryModel]) {
                         flags.push(modelFlags[memoryModel]);
                     }
-                    // C251 binary mode (对应 MODC251，但 C251 编译器用 modbin)
-                    flags.push('modbin');
+
+                    // uSrcBin=0 表示 BINARY 模式 (需要 modbin 控制字)
+                    // uSrcBin=1 表示 SOURCE 模式 (C251 默认，不需要额外控制字)
+                    if (uSrcBin === '0') {
+                        flags.push('modbin');
+                    }
 
                     const autoFlags = flags.join(' ');
                     c251Misc = autoFlags + (c251Misc ? ' ' + c251Misc : '');
@@ -188,8 +192,9 @@ export class UvprojParser {
             }
 
             // 如果 C251Misc 为空，给安全的默认值（Keil 无法推导配置时用）
+            // SOURCE 模式是默认，不加 modbin 以兼容大多数 STC32G 库文件
             if (!c251Misc) {
-                c251Misc = 'large modbin';
+                c251Misc = 'large';
             }
 
             // === 5. 提取文件分组 ===
