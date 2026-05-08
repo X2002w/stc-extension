@@ -145,6 +145,34 @@ export class UvprojParser {
                 if (lx51Node) {
                     l251Misc = this.getText(lx51Node, 'MiscControls') || '';
                 }
+
+                // 从 Target251Misc 提取芯片配置，转换为编译器参数
+                const target251Misc = this.findNode(target251, 'Target251Misc');
+                if (target251Misc) {
+                    const memoryModel = this.getText(target251Misc, 'MemoryModel');
+                    const romSize = this.getText(target251Misc, 'RomSize');
+
+                    // MemoryModel → C251 编译参数
+                    // 0=SMALL, 2=COMPACT, 3=LARGE, 4=HLARGE
+                    const modelFlags: Record<string, string> = {
+                        '0': 'SMALL', '2': 'COMPACT', '3': 'LARGE', '4': 'HLARGE',
+                    };
+
+                    const flags: string[] = [];
+                    if (memoryModel && modelFlags[memoryModel]) {
+                        flags.push(modelFlags[memoryModel]);
+                    }
+                    flags.push('MODC251');
+
+                    // 将自动推导的 flags 放在 MiscControls 前面
+                    const autoFlags = flags.join(' ');
+                    c251Misc = autoFlags + (c251Misc ? ' ' + c251Misc : '');
+
+                    // L251 也需要相关参数
+                    if (romSize && modelFlags[romSize]) {
+                        l251Misc = 'ROM(' + modelFlags[romSize] + ')' + (l251Misc ? ' ' + l251Misc : '');
+                    }
+                }
             } else {
                 // 回退：旧格式的 VariousControls
                 const vc = this.findNode(parsed, 'VariousControls');
@@ -160,10 +188,9 @@ export class UvprojParser {
                 }
             }
 
-            // 如果 C251Misc 为空，给一个安全的默认值
-
+            // 如果 C251Misc 为空，给安全的默认值（Keil 无法推导配置时用）
             if (!c251Misc) {
-                c251Misc = 'OPTIMIZE(8)';
+                c251Misc = 'LARGE MODC251';
             }
 
             // === 5. 提取文件分组 ===
