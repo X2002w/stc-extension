@@ -1,0 +1,210 @@
+{
+  "name": "stc-extension",
+  "displayName": "STC32G12K128",
+  "description": "VS Code 扩展，支持 STC32G12K128 单片机的 Keil C251 工程管理与编译",
+  "version": "0.1.0",
+  "publisher": "stc-dev",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:stc-extension.build",
+    "onCommand:stc-extension.clean",
+    "onCommand:stc-extension.configure",
+    "onCommand:stc-extension.setToolchainPath",
+    "onCommand:stc-extension.refreshProject",
+    "onCommand:stc-extension.newProject",
+    "workspaceContains:**/*.uvproj",
+    "workspaceContains:**/*.uvprojx",
+    "workspaceContains:**/stc-project.json"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "stc-project",
+          "title": "STC 工程",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "stc-project": [
+        {
+          "id": "stcProjectExplorer",
+          "name": "工程文件"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "stc-extension.build",
+        "title": "编译工程",
+        "icon": "$(run)"
+      },
+      {
+        "command": "stc-extension.clean",
+        "title": "清理编译产物",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "stc-extension.rebuild",
+        "title": "重新编译工程",
+        "icon": "$(debug-rerun)"
+      },
+      {
+        "command": "stc-extension.configure",
+        "title": "配置工程",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "stc-extension.setToolchainPath",
+        "title": "设置 Keil C251 工具链路径",
+        "icon": "$(folder-opened)"
+      },
+      {
+        "command": "stc-extension.refreshProject",
+        "title": "刷新工程树",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "stc-extension.newProject",
+        "title": "新建 STC 工程",
+        "icon": "$(new-file)"
+      },
+      {
+        "command": "stc-extension.compileSingleFile",
+        "title": "编译当前文件",
+        "icon": "$(file-code)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "stc-extension.build",
+          "when": "view == stcProjectExplorer",
+          "group": "navigation@1"
+        },
+        {
+          "command": "stc-extension.rebuild",
+          "when": "view == stcProjectExplorer",
+          "group": "navigation@2"
+        },
+        {
+          "command": "stc-extension.clean",
+          "when": "view == stcProjectExplorer",
+          "group": "navigation@3"
+        },
+        {
+          "command": "stc-extension.refreshProject",
+          "when": "view == stcProjectExplorer",
+          "group": "navigation@5"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "stc-extension.compileSingleFile",
+          "when": "view == stcProjectExplorer && viewItem == cSource"
+        },
+        {
+          "command": "stc-extension.compileSingleFile",
+          "when": "view == stcProjectExplorer && viewItem == asmSource"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "STC Extension",
+      "properties": {
+        "stc-extension.toolchainPath": {
+          "type": "string",
+          "default": "F:\\MPU\\C251\\",
+          "description": "Keil C251 工具链路径（C251.EXE, A251.EXE, L251.EXE, OH251.EXE 所在目录）"
+        }
+      }
+    },
+    "taskDefinitions": [
+      {
+        "type": "stc-build",
+        "required": [
+          "command"
+        ],
+        "properties": {
+          "command": {
+            "type": "string",
+            "description": "编译命令: build, clean, rebuild",
+            "enum": [
+              "build",
+              "clean",
+              "rebuild"
+            ]
+          }
+        }
+      }
+    ],
+    "problemMatchers": [
+      {
+        "name": "stc-c251",
+        "label": "Keil C251 C Compiler",
+        "owner": "stc-c251",
+        "fileLocation": "absolute",
+        "pattern": {
+          "regexp": "^\\*\\*\\* (ERROR|WARNING) (C\\d+) IN LINE (\\d+) OF ([^:]+): (.+)$",
+          "severity": 1,
+          "code": 2,
+          "line": 3,
+          "file": 4,
+          "message": 5
+        }
+      },
+      {
+        "name": "stc-a251",
+        "label": "Keil A251 Assembler",
+        "owner": "stc-a251",
+        "fileLocation": "absolute",
+        "pattern": {
+          "regexp": "^\\*\\*\\* (ERROR|WARNING) (A\\d+) IN (\\d+) \\(([^,]+), LINE (\\d+)\\): (.+)$",
+          "severity": 1,
+          "code": 2,
+          "file": 4,
+          "line": 5,
+          "message": 6
+        }
+      },
+      {
+        "name": "stc-l251",
+        "label": "Keil L251 Linker",
+        "owner": "stc-l251",
+        "fileLocation": "absolute",
+        "pattern": {
+          "regexp": "^\\*\\*\\* (ERROR|WARNING) (L\\d+): (.+)$",
+          "severity": 1,
+          "code": 2,
+          "message": 3
+        }
+      }
+    ],
+    "snippets": [
+      {
+        "language": "c",
+        "path": "./snippets/stc32.json"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "fast-xml-parser": "^4.3.0"
+  }
+}
