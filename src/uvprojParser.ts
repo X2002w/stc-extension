@@ -44,7 +44,7 @@ export class UvprojParser {
         }
 
         const rootPath = workspaceFolders[0].uri.fsPath;
-        const patterns = ['*.uvproj', '*.uvprojx'];
+        const patterns = ['**/*.uvproj', '**/*.uvprojx'];
         for (const pattern of patterns) {
             const files = await vscode.workspace.findFiles(
                 new vscode.RelativePattern(rootPath, pattern),
