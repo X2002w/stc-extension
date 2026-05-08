@@ -176,9 +176,34 @@ export class StcCompiler {
                 // 生成链接控制文件（包含编译生成的 .obj 和预编译库/目标文件）
                 const allLinkFiles = [...objFiles, ...linkOnlyFiles];
                 const linkFile = path.join(project.outputDir, 'project.lin');
-                const linkContent = allLinkFiles.map((f) => `"${f}"`).join(',\n')
-                    + `\nTO "${path.join(project.outputDir, project.name)}.abs"`
-                    + ` ${project.l251Misc || ''}`;
+                const absPath = path.join(project.outputDir, project.name + '.abs');
+                const mapPath = path.join(project.outputDir, project.name + '.map');
+
+                // 构建链接控制文件内容
+                // 格式: obj列表 → TO → PRINT(mAP) → DISABLEWARNING → REMOVEUNUSED → CLASSES
+                const linkLines: string[] = [];
+                linkLines.push(allLinkFiles.map((f) => `"${f}"`).join(',\n'));
+                linkLines.push(`TO "${absPath}"`);
+
+                // 生成 Map 文件
+                linkLines.push(`PRINT("${mapPath}")`);
+
+                // 屏蔽未调用函数/段的警告 (Keil 默认屏蔽 15,16,57)
+                if (project.l251DisableWarnings) {
+                    linkLines.push(`DISABLEWARNING (${project.l251DisableWarnings.replace(/,/g, ', ')})`);
+                }
+
+                // 用户自定义的 L251 杂项控制（如 REMOVEUNUSED）
+                if (project.l251Misc) {
+                    linkLines.push(project.l251Misc);
+                }
+
+                // 内存布局 CLASSES 指令
+                if (project.l251Classes) {
+                    linkLines.push(`CLASSES (${project.l251Classes})`);
+                }
+
+                const linkContent = linkLines.join('\n');
                 fs.writeFileSync(linkFile, linkContent);
 
                 this.outputChannel.appendLine('[L251] 链接...');

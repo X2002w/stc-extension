@@ -350,6 +350,8 @@ async function autoLoadProject(): Promise<void> {
                     l251Misc: config.linker
                         ? `RS(${config.linker.ramSize || 256}) PL(${config.linker.codeSize || 256})`
                         : '',
+                    l251DisableWarnings: '',
+                    l251Classes: '',
                 };
                 projectTreeProvider.setProject(project, false);
                 return;

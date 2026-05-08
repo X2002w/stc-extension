@@ -20,6 +20,8 @@ export interface UvprojProject {
     c251Misc: string;
     a251Misc: string;
     l251Misc: string;
+    l251DisableWarnings: string;  // 屏蔽的 L251 警告编号，如 "15,16,57"
+    l251Classes: string;          // CLASSES 内存布局指令，如 "EDATA (0x0-0xFFF), HDATA (0x0-0xFFF)"
 }
 
 export class UvprojParser {
@@ -114,6 +116,8 @@ export class UvprojParser {
             let c251Misc = '';
             let a251Misc = '';
             let l251Misc = '';
+            let l251DisableWarnings = '';
+            let l251Classes = '';
             let defines: string[] = [];
             let includePaths: string[] = [];
 
@@ -154,9 +158,11 @@ export class UvprojParser {
                 const lx51Node = this.findNode(target251, 'Lx51');
                 if (lx51Node) {
                     l251Misc = this.getText(lx51Node, 'MiscControls') || '';
+                    // 读取需要屏蔽的警告编号（如 15,16,57 对应 UNCALLED FUNCTION/SEGMENT）
+                    l251DisableWarnings = this.getText(lx51Node, 'DisableWarningNumbers') || '';
                 }
 
-                // 从 Target251Misc 提取芯片配置，转换为编译器参数
+                // 从 Target251Misc 提取芯片配置和片上内存布局
                 // 注意：C251 V5.60 所有控制字必须小写！
                 const target251Misc = this.findNode(target251, 'Target251Misc');
                 if (target251Misc) {
@@ -185,6 +191,22 @@ export class UvprojParser {
 
                     const autoFlags = flags.join(' ');
                     c251Misc = autoFlags + (c251Misc ? ' ' + c251Misc : '');
+
+                    // 从 OnChipMemories 生成 L251 CLASSES 指令（内存布局）
+                    // C251 架构中 EDATA 和 HDATA 都映射到内部 IRAM
+                    const onChip = this.findNode(target251Misc, 'OnChipMemories');
+                    if (onChip) {
+                        const iram = this.findNode(onChip, 'IRAM');
+                        if (iram) {
+                            const start = this.getText(iram, 'StartAddress') || '0x0';
+                            const size = this.getText(iram, 'Size');
+                            if (size && parseInt(size, 16) > 0) {
+                                const endAddr = '0x' + (parseInt(start, 16) + parseInt(size, 16) - 1).toString(16).toUpperCase();
+                                const range = `${start}-${endAddr}`;
+                                l251Classes = `EDATA (${range}), HDATA (${range})`;
+                            }
+                        }
+                    }
                     // 注意：RomSize 只影响 C251 编译器参数，L251 通过设备数据库 (STC.CDB) 获取 ROM 配置
                     // 不向 l251Misc 添加 rom() 指令，因为 L251 不支持该指令
                 }
@@ -291,6 +313,8 @@ export class UvprojParser {
                 c251Misc,
                 a251Misc,
                 l251Misc,
+                l251DisableWarnings,
+                l251Classes,
             };
         } catch (error) {
             vscode.window.showErrorMessage(
