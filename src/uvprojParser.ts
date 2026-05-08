@@ -13,6 +13,7 @@ export interface UvprojProject {
     device: string;
     toolchainPath: string;
     groups: FileGroup[];
+    libraries: string[];        // .lib / .obj 文件，直接传给链接器，不需要编译
     defines: string[];
     includePaths: string[];
     outputDir: string;
@@ -193,7 +194,9 @@ export class UvprojParser {
 
             // === 5. 提取文件分组 ===
             // 实际结构: Target > Groups > Group > Files > File
+            // FileType: 1=C源文件, 2=汇编, 3=目标文件(.obj), 4=库文件(.lib), 5=头文件
             const fileGroups: FileGroup[] = [];
+            const libraryFiles: string[] = [];
             const groupsContainer = this.findNode(target, 'Groups');
             let groupNodes: any[] = [];
 
@@ -242,7 +245,14 @@ export class UvprojParser {
                                 filePath,
                                 fileName
                             );
-                            if (realPath) {
+                            if (!realPath) {
+                                continue;
+                            }
+
+                            // FileType 3 (目标文件) 和 4 (库文件) → 直接传给链接器
+                            if (fileType === '3' || fileType === '4') {
+                                libraryFiles.push(realPath);
+                            } else {
                                 files.push(realPath);
                             }
                         }
@@ -258,6 +268,7 @@ export class UvprojParser {
                 device,
                 toolchainPath: this.guessToolchainPath(),
                 groups: fileGroups,
+                libraries: libraryFiles,
                 defines,
                 includePaths,
                 outputDir,

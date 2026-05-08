@@ -73,6 +73,16 @@ export class StcCompiler {
                 }
             }
 
+            // 收集库文件和预编译目标文件（直接传给链接器）
+            const linkOnlyFiles: string[] = (project.libraries || []).filter((f) => {
+                // 过滤掉不存在的文件
+                if (!fs.existsSync(f)) {
+                    this.outputChannel.appendLine(`[警告] 库文件不存在，已跳过: ${f}`);
+                    return false;
+                }
+                return true;
+            });
+
             // 构建共同的命令行参数（每个 incdir/define 作为独立参数，C251 V5.60 要求小写）
             const includeArgs: string[] = project.includePaths.map((inc) => `incdir(${inc})`);
             const defineArgs: string[] = project.defines.length > 0
@@ -163,9 +173,10 @@ export class StcCompiler {
             // 步骤3: 链接 (L251.EXE)
             let linkFailed = false;
             if (objFiles.length > 0) {
-                // 生成链接控制文件
+                // 生成链接控制文件（包含编译生成的 .obj 和预编译库/目标文件）
+                const allLinkFiles = [...objFiles, ...linkOnlyFiles];
                 const linkFile = path.join(project.outputDir, 'project.lin');
-                const linkContent = objFiles.map((f) => `"${f}"`).join(',\n')
+                const linkContent = allLinkFiles.map((f) => `"${f}"`).join(',\n')
                     + `\nTO "${path.join(project.outputDir, project.name)}.abs"`
                     + ` ${project.l251Misc || ''}`;
                 fs.writeFileSync(linkFile, linkContent);

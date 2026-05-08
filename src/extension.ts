@@ -337,6 +337,7 @@ async function autoLoadProject(): Promise<void> {
                             .get<string>('toolchainPath') ||
                         'F:\\MPU\\C251\\',
                     groups,
+                    libraries: [],
                     defines: config.defines || [],
                     includePaths: config.headers
                         ? config.headers.map((h: string) => path.resolve(rootPath, h))
