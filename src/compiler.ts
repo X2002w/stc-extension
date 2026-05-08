@@ -88,7 +88,7 @@ export class StcCompiler {
                 );
                 objFiles.push(objFile);
 
-                const miscArgs = (project.c251Misc || 'OPTIMIZE(8)').split(/\s+/).filter(Boolean);
+                const miscArgs = (project.c251Misc || 'large modbin').split(/\s+/).filter(Boolean);
                 const args = [
                     cFile,
                     ...miscArgs,

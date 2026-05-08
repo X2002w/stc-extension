@@ -191,7 +191,7 @@ export class UvprojParser {
 
             // 如果 C251Misc 为空，给安全的默认值（Keil 无法推导配置时用）
             if (!c251Misc) {
-                c251Misc = 'LARGE MODC251';
+                c251Misc = 'large modbin';
             }
 
             // === 5. 提取文件分组 ===
