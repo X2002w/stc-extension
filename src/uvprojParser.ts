@@ -147,30 +147,31 @@ export class UvprojParser {
                 }
 
                 // 从 Target251Misc 提取芯片配置，转换为编译器参数
+                // 注意：C251 V5.60 所有控制字必须小写！
                 const target251Misc = this.findNode(target251, 'Target251Misc');
                 if (target251Misc) {
                     const memoryModel = this.getText(target251Misc, 'MemoryModel');
                     const romSize = this.getText(target251Misc, 'RomSize');
 
-                    // MemoryModel → C251 编译参数
-                    // 0=SMALL, 2=COMPACT, 3=LARGE, 4=HLARGE
+                    // MemoryModel → C251 编译参数（小写）
+                    // 0=small, 2=compact, 3=large, 4=xlarge
                     const modelFlags: Record<string, string> = {
-                        '0': 'SMALL', '2': 'COMPACT', '3': 'LARGE', '4': 'HLARGE',
+                        '0': 'small', '2': 'compact', '3': 'large', '4': 'large',
                     };
 
                     const flags: string[] = [];
                     if (memoryModel && modelFlags[memoryModel]) {
                         flags.push(modelFlags[memoryModel]);
                     }
-                    flags.push('MODC251');
+                    // C251 binary mode (对应 MODC251，但 C251 编译器用 modbin)
+                    flags.push('modbin');
 
-                    // 将自动推导的 flags 放在 MiscControls 前面
                     const autoFlags = flags.join(' ');
                     c251Misc = autoFlags + (c251Misc ? ' ' + c251Misc : '');
 
-                    // L251 也需要相关参数
+                    // L251 链接器参数（同样小写）
                     if (romSize && modelFlags[romSize]) {
-                        l251Misc = 'ROM(' + modelFlags[romSize] + ')' + (l251Misc ? ' ' + l251Misc : '');
+                        l251Misc = 'rom(' + modelFlags[romSize] + ')' + (l251Misc ? ' ' + l251Misc : '');
                     }
                 }
             } else {

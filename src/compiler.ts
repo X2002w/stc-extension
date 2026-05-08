@@ -397,7 +397,7 @@ export class StcCompiler {
     }
 
     /**
-     * 执行外部工具
+     * 执行外部工具（自动为含空格的参数加引号）
      */
     private execTool(
         exePath: string,
@@ -408,7 +408,15 @@ export class StcCompiler {
             let stdout = '';
             let stderr = '';
 
-            const proc = spawn(exePath, args, {
+            // 为含空格的参数加双引号，防止命令行解析时路径被截断
+            const quotedArgs = args.map((arg) => {
+                if (arg.includes(' ') && !arg.startsWith('"')) {
+                    return `"${arg}"`;
+                }
+                return arg;
+            });
+
+            const proc = spawn(exePath, quotedArgs, {
                 cwd,
                 shell: true,
                 stdio: 'pipe',
