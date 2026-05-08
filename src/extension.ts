@@ -344,7 +344,7 @@ async function autoLoadProject(): Promise<void> {
                     outputDir: config.output?.name
                         ? path.join(rootPath, config.output.name)
                         : path.join(rootPath, 'output'),
-                    c251Misc: config.c251Misc || 'DB OE MODC251',
+                    c251Misc: config.c251Misc || 'large modbin',
                     a251Misc: config.a251Misc || '',
                     l251Misc: config.linker
                         ? `RS(${config.linker.ramSize || 256}) PL(${config.linker.codeSize || 256})`

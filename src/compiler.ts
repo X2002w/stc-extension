@@ -73,10 +73,10 @@ export class StcCompiler {
                 }
             }
 
-            // 构建共同的命令行参数（每个 INCDIR/DEFINE 作为独立参数）
-            const includeArgs: string[] = project.includePaths.map((inc) => `INCDIR(${inc})`);
+            // 构建共同的命令行参数（每个 incdir/define 作为独立参数，C251 V5.60 要求小写）
+            const includeArgs: string[] = project.includePaths.map((inc) => `incdir(${inc})`);
             const defineArgs: string[] = project.defines.length > 0
-                ? [`DEFINE(${project.defines.join(', ')})`]
+                ? [`define(${project.defines.join(', ')})`]
                 : [];
 
             // 步骤1: 编译 C 源文件 (C251.EXE)
@@ -94,7 +94,7 @@ export class StcCompiler {
                     ...miscArgs,
                     ...includeArgs,
                     ...defineArgs,
-                    `OBJECT(${objFile})`,
+                    `object(${objFile})`,
                 ];
 
                 this.outputChannel.appendLine(
@@ -133,7 +133,7 @@ export class StcCompiler {
                 const args = [
                     asmFile,
                     ...miscArgs.split(/\s+/),
-                    `OBJECT(${objFile})`,
+                    `object(${objFile})`,
                 ].filter((a) => a.length > 0);
 
                 this.outputChannel.appendLine(
@@ -245,7 +245,7 @@ export class StcCompiler {
         this.outputChannel.appendLine(`[C251] 编译 ${path.basename(filePath)}...`);
 
         const workspaceRoot = this.getWorkspaceRoot() || path.dirname(filePath);
-        const result = await this.execTool(c251Path, [filePath, 'OPTIMIZE(8)'], workspaceRoot);
+        const result = await this.execTool(c251Path, [filePath, 'optimize(8)'], workspaceRoot);
 
         this.outputChannel.append(result.stdout);
         if (result.stderr) {
