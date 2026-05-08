@@ -73,13 +73,11 @@ export class StcCompiler {
                 }
             }
 
-            // 构建共同的命令行参数
-            const includeArgs = project.includePaths
-                .map((inc) => `INCDIR(${inc})`)
-                .join(' ');
-            const defineArgs = project.defines.length > 0
-                ? `DEFINE(${project.defines.join(', ')})`
-                : '';
+            // 构建共同的命令行参数（每个 INCDIR/DEFINE 作为独立参数）
+            const includeArgs: string[] = project.includePaths.map((inc) => `INCDIR(${inc})`);
+            const defineArgs: string[] = project.defines.length > 0
+                ? [`DEFINE(${project.defines.join(', ')})`]
+                : [];
 
             // 步骤1: 编译 C 源文件 (C251.EXE)
             const objFiles: string[] = [];
@@ -90,14 +88,14 @@ export class StcCompiler {
                 );
                 objFiles.push(objFile);
 
-                const miscArgs = project.c251Misc || 'DB OE MODC251';
+                const miscArgs = (project.c251Misc || 'OPTIMIZE(8)').split(/\s+/).filter(Boolean);
                 const args = [
                     cFile,
-                    ...miscArgs.split(/\s+/),
-                    includeArgs,
-                    defineArgs,
+                    ...miscArgs,
+                    ...includeArgs,
+                    ...defineArgs,
                     `OBJECT(${objFile})`,
-                ].filter((a) => a.length > 0);
+                ];
 
                 this.outputChannel.appendLine(
                     `[C251] 编译 ${path.basename(cFile)}...`
