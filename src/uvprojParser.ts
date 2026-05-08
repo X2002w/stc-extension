@@ -168,11 +168,8 @@ export class UvprojParser {
 
                     const autoFlags = flags.join(' ');
                     c251Misc = autoFlags + (c251Misc ? ' ' + c251Misc : '');
-
-                    // L251 链接器参数（同样小写）
-                    if (romSize && modelFlags[romSize]) {
-                        l251Misc = 'rom(' + modelFlags[romSize] + ')' + (l251Misc ? ' ' + l251Misc : '');
-                    }
+                    // 注意：RomSize 只影响 C251 编译器参数，L251 通过设备数据库 (STC.CDB) 获取 ROM 配置
+                    // 不向 l251Misc 添加 rom() 指令，因为 L251 不支持该指令
                 }
             } else {
                 // 回退：旧格式的 VariousControls
