@@ -1,0 +1,104 @@
+{
+  "STC32 中断服务程序": {
+    "prefix": "stc_isr",
+    "body": [
+      "void isr_${1:uart1}() interrupt ${2:4} using ${3:1}",
+      "{",
+      "    ${0}",
+      "}"
+    ],
+    "description": "STC32 中断服务程序模板"
+  },
+  "STC32 主函数模板": {
+    "prefix": "stc_main",
+    "body": [
+      "#include \"STC32G.h\"",
+      "#include \"intrins.h\"",
+      "",
+      "void main(void)",
+      "{",
+      "    // 初始化",
+      "    ${1:Init();}",
+      "",
+      "    while (1)",
+      "    {",
+      "        ${0}",
+      "    }",
+      "}"
+    ],
+    "description": "STC32G12K128 主函数模板"
+  },
+  "STC32 延时函数 (11.0592MHz)": {
+    "prefix": "stc_delay_ms",
+    "body": [
+      "void Delay${1:1}ms(void)",
+      "{",
+      "    unsigned char i, j;",
+      "    for (i = 0; i < ${1:1}; i++)",
+      "    {",
+      "        for (j = 0; j < 921; j++); // @11.0592MHz",
+      "    }",
+      "}"
+    ],
+    "description": "STC32 毫秒延时函数 (11.0592MHz)"
+  },
+  "STC32 GPIO 初始化": {
+    "prefix": "stc_gpio_init",
+    "body": [
+      "void GPIO_Init(void)",
+      "{",
+      "    P0M0 = ${1:0x00}; P0M1 = ${2:0x00}; // P0 模式",
+      "    P1M0 = ${3:0x00}; P1M1 = ${4:0x00}; // P1 模式",
+      "    P2M0 = ${5:0x00}; P2M1 = ${6:0x00}; // P2 模式",
+      "    P3M0 = ${7:0x00}; P3M1 = ${8:0x00}; // P3 模式",
+      "    P4M0 = ${9:0x00}; P4M1 = ${10:0x00}; // P4 模式",
+      "    P5M0 = ${11:0x00}; P5M1 = ${12:0x00}; // P5 模式",
+      "    ${0}",
+      "}"
+    ],
+    "description": "STC32 GPIO 模式初始化模板"
+  },
+  "STC32 UART 初始化": {
+    "prefix": "stc_uart_init",
+    "body": [
+      "void UART${1:1}_Init(void)",
+      "{",
+      "    // 使用定时器${2:2}作为波特率发生器",
+      "    S${1:1}CON = 0x50;  // 8位数据, 可变波特率",
+      "    AUXR |= 0x${3:01};  // 定时器${2:2}为1T模式",
+      "    T${2:2}L = ${4:0xE0};   // 波特率 = ${5:115200}",
+      "    T${2:2}H = ${6:0xFE};",
+      "    T${2:2}H = 0xFF;",
+      "    TR${2:2} = 1;",
+      "    ES${1:1} = ${7:1};     // 使能UART${1:1}中断",
+      "    ${0}",
+      "}"
+    ],
+    "description": "STC32 UART 串口初始化模板"
+  },
+  "STC32 定时器初始化": {
+    "prefix": "stc_timer_init",
+    "body": [
+      "void Timer${1:0}_Init(void)",
+      "{",
+      "    AUXR |= 0x${2:80};  // 定时器${1:0} 1T模式",
+      "    TMOD &= ~${3:0x0F}; // 定时器${1:0} 模式控制位清零",
+      "    TMOD |= ${4:0x00};  // 16位自动重装模式",
+      "    TL${1:0} = ${5:0x00};",
+      "    TH${1:0} = ${6:0x00};",
+      "    TR${1:0} = 1;       // 启动定时器",
+      "    ET${1:0} = ${7:1};       // 使能定时器${1:0}中断",
+      "    ${0}",
+      "}"
+    ],
+    "description": "STC32 定时器初始化模板"
+  },
+  "STC32 包含头文件": {
+    "prefix": "stc_include",
+    "body": [
+      "#include \"STC32G.h\"",
+      "#include \"intrins.h\""
+    ],
+    "description": "STC32 常用头文件"
+  }
+}
