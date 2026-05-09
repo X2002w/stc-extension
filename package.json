@@ -157,8 +157,17 @@
         "stc-extension.c251OptimizeEmphasis": {
           "type": "string",
           "default": "SPEED",
-          "enum": ["SPEED", "BALANCED", "SIZE"],
-          "description": "C251 优化侧重 (SPEED=速度, BALANCED=平衡, SIZE=体积)"
+          "enum": ["SPEED", "SIZE"],
+          "enumDescriptions": [
+            "优先优化执行速度 | Favor execution speed",
+            "优先优化代码体积 | Favor code size"
+          ],
+          "description": "C251 优化侧重"
+        },
+        "stc-extension.c251AliasChecking": {
+          "type": "boolean",
+          "default": true,
+          "description": "指针访问的别名检查 | Alias checking on pointer accesses — 关闭则生成 NOALIAS"
         },
         "stc-extension.c251MemoryModel": {
           "type": "string",

@@ -444,13 +444,19 @@ function getC251Config(): {
     }
 
     if (optLevel === 'DEFAULT') {
-        // 默认优化：仅 SIZE 侧重时生成 OPTIMIZE(SIZE)；SPEED/BALANCED 不生成 OPTIMIZE
+        // 默认优化：仅 SIZE 侧重时生成 OPTIMIZE(SIZE)；SPEED 不生成 OPTIMIZE
         if (emphasis === 'SIZE') {
             controlParts.push('OPTIMIZE(SIZE)');
         }
     } else {
         // 指定优化等级：生成 OPTIMIZE(n, emphasis)
         controlParts.push(`OPTIMIZE(${optLevel},${emphasis})`);
+    }
+
+    // 别名检查：关闭时生成 NOALIAS
+    const aliasChecking = config.get<boolean>('c251AliasChecking', true);
+    if (!aliasChecking) {
+        controlParts.push('NOALIAS');
     }
 
     controlParts.push('BROWSE');
