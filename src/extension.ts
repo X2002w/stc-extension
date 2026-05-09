@@ -291,19 +291,7 @@ async function handleCreateFileInGroup(item: any): Promise<void> {
         }
     }
 
-    // 根据扩展名生成模板内容
-    const ext = path.extname(fileName).toLowerCase();
-    let template = '';
-    if (ext === '.c') {
-        template = `#include "STC32G.h"\n\n`;
-    } else if (ext === '.h') {
-        const guard = fileName.toUpperCase().replace(/[^A-Z0-9]/g, '_') + '_';
-        template = `#ifndef ${guard}\n#define ${guard}\n\n\n#endif\n`;
-    } else {
-        template = `; ${fileName}\n`;
-    }
-
-    fs.writeFileSync(fullPath, template);
+    fs.writeFileSync(fullPath, '');
 
     // 写入 uvproj 分组
     const ok = await uvprojParser.addFileToGroup(
