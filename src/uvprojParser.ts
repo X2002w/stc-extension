@@ -337,12 +337,18 @@ export class UvprojParser {
             const projectDir = path.dirname(uvprojPath);
             let xml = fs.readFileSync(uvprojPath, 'utf-8');
 
-            // 计算相对路径
-            const relPath = path.relative(projectDir, filePath).replace(/\\/g, '/');
-            const dir = path.dirname(relPath) + '/';
+            // 计算相对路径（完整路径，含文件名，保持反斜杠与 Keil 格式一致）
+            const relPath = path.relative(projectDir, filePath);
             const fileName = path.basename(filePath);
             const ext = path.extname(filePath).toLowerCase();
-            const fileType = (ext === '.a51' || ext === '.asm') ? '2' : '1';
+
+            // FileType 映射（与 Keil 一致）
+            // 1=C源文件, 2=汇编, 4=库文件, 5=头文件
+            const fileTypeMap: Record<string, string> = {
+                '.c': '1', '.a51': '2', '.asm': '2',
+                '.lib': '4', '.h': '5',
+            };
+            const fileType = fileTypeMap[ext] || '1';
 
             // 定位目标分组: <GroupName>groupName</GroupName>
             const escapedGroup = this.escapeRegex(groupName);
@@ -373,12 +379,12 @@ export class UvprojParser {
             const indent3 = indent2 + '\t';
             const indent4 = indent3 + '\t';
 
-            // 构造 File 节点
+            // 构造 File 节点（与 Keil 格式一致：FileName → FileType → FilePath）
             const fileEntry = [
                 `${indent3}<File>`,
-                `${indent4}<FilePath>${this.xmlEscape(dir)}</FilePath>`,
                 `${indent4}<FileName>${this.xmlEscape(fileName)}</FileName>`,
                 `${indent4}<FileType>${fileType}</FileType>`,
+                `${indent4}<FilePath>${this.xmlEscape(relPath)}</FilePath>`,
                 `${indent3}</File>`,
             ].join('\n');
 
