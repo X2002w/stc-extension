@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { XMLParser } from 'fast-xml-parser';
+import { XMLParser, XMLBuilder } from 'fast-xml-parser';
 
 export interface FileGroup {
     name: string;
@@ -321,6 +321,172 @@ export class UvprojParser {
                 `解析 Keil 工程文件失败: ${error instanceof Error ? error.message : String(error)}`
             );
             return undefined;
+        }
+    }
+
+    /**
+     * 向 uvproj 工程文件中添加文件到指定分组
+     * @returns 是否成功
+     */
+    async addFileToGroup(
+        uvprojPath: string,
+        groupName: string,
+        filePath: string
+    ): Promise<boolean> {
+        try {
+            const projectDir = path.dirname(uvprojPath);
+            const xmlContent = fs.readFileSync(uvprojPath, 'utf-8');
+            const parsed = this.xmlParser.parse(xmlContent);
+
+            // 定位 Groups 容器
+            const project = this.findNode(parsed, 'Project');
+            if (!project) return false;
+            const targets = this.findNode(project, 'Targets');
+            if (!targets) return false;
+            const target = this.findNode(targets, 'Target');
+            if (!target) return false;
+            const groups = this.findNode(target, 'Groups');
+            if (!groups) return false;
+
+            // 找到目标分组
+            let groupNodes = this.findNode(groups, 'Group');
+            if (!groupNodes) return false;
+            groupNodes = Array.isArray(groupNodes) ? groupNodes : [groupNodes];
+
+            const targetGroup = groupNodes.find(
+                (g: any) => this.getText(g, 'GroupName') === groupName
+            );
+            if (!targetGroup) return false;
+
+            // 构建文件节点
+            const relPath = path.relative(projectDir, filePath).replace(/\\/g, '/');
+            const dir = path.dirname(relPath) + '/';
+            const fileName = path.basename(filePath);
+            const ext = path.extname(filePath).toLowerCase();
+            const fileType = (ext === '.a51' || ext === '.asm') ? '2' : '1';
+
+            const newFile: any = {
+                FilePath: dir,
+                FileName: fileName,
+                FileType: fileType,
+            };
+
+            // 添加到 Files 列表
+            let filesNode = this.findNode(targetGroup, 'Files');
+            if (!filesNode) {
+                // 分组下没有 Files 节点，创建一个
+                filesNode = { File: newFile };
+                targetGroup.Files = filesNode;
+            } else {
+                let fileList = filesNode.File;
+                if (!fileList) {
+                    filesNode.File = newFile;
+                } else {
+                    fileList = Array.isArray(fileList) ? fileList : [fileList];
+                    fileList.push(newFile);
+                    filesNode.File = fileList;
+                }
+            }
+
+            // 回写 XML
+            const builder = new XMLBuilder({
+                format: true,
+                ignoreAttributes: false,
+                attributeNamePrefix: '',
+                textNodeName: '#text',
+                suppressEmptyNode: true,
+            });
+            const newXml = builder.build(parsed);
+
+            // fast-xml-parser 生成 XML declaration 可能格式不同，规范化
+            const fixedXml = newXml.replace(
+                /<\?xml.*?\?>/,
+                '<?xml version="1.0" encoding="UTF-8"?>'
+            );
+
+            fs.writeFileSync(uvprojPath, fixedXml);
+            return true;
+        } catch (error) {
+            vscode.window.showErrorMessage(
+                `添加文件到分组失败: ${error instanceof Error ? error.message : String(error)}`
+            );
+            return false;
+        }
+    }
+
+    /**
+     * 从 uvproj 工程文件中删除指定分组中的文件
+     * @returns 是否成功
+     */
+    async removeFileFromGroup(
+        uvprojPath: string,
+        groupName: string,
+        filePath: string
+    ): Promise<boolean> {
+        try {
+            const projectDir = path.dirname(uvprojPath);
+            const xmlContent = fs.readFileSync(uvprojPath, 'utf-8');
+            const parsed = this.xmlParser.parse(xmlContent);
+
+            // 定位 Groups 容器
+            const project = this.findNode(parsed, 'Project');
+            if (!project) return false;
+            const targets = this.findNode(project, 'Targets');
+            if (!targets) return false;
+            const target = this.findNode(targets, 'Target');
+            if (!target) return false;
+            const groups = this.findNode(target, 'Groups');
+            if (!groups) return false;
+
+            // 找到目标分组
+            let groupNodes = this.findNode(groups, 'Group');
+            if (!groupNodes) return false;
+            groupNodes = Array.isArray(groupNodes) ? groupNodes : [groupNodes];
+
+            const targetGroup = groupNodes.find(
+                (g: any) => this.getText(g, 'GroupName') === groupName
+            );
+            if (!targetGroup) return false;
+
+            const filesNode = this.findNode(targetGroup, 'Files');
+            if (!filesNode) return false;
+
+            let fileList = filesNode.File;
+            if (!fileList) return false;
+            fileList = Array.isArray(fileList) ? fileList : [fileList];
+
+            const fileName = path.basename(filePath);
+            filesNode.File = fileList.filter((f: any) => {
+                const name = this.getText(f, 'FileName') || '';
+                return name !== fileName;
+            });
+
+            // 确保 File 数组不为空时不变成单个对象
+            if (Array.isArray(filesNode.File) && filesNode.File.length === 1) {
+                filesNode.File = filesNode.File[0];
+            }
+
+            // 回写 XML
+            const builder = new XMLBuilder({
+                format: true,
+                ignoreAttributes: false,
+                attributeNamePrefix: '',
+                textNodeName: '#text',
+                suppressEmptyNode: true,
+            });
+            const newXml = builder.build(parsed);
+            const fixedXml = newXml.replace(
+                /<\?xml.*?\?>/,
+                '<?xml version="1.0" encoding="UTF-8"?>'
+            );
+
+            fs.writeFileSync(uvprojPath, fixedXml);
+            return true;
+        } catch (error) {
+            vscode.window.showErrorMessage(
+                `从分组删除文件失败: ${error instanceof Error ? error.message : String(error)}`
+            );
+            return false;
         }
     }
 

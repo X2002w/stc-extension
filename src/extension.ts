@@ -73,6 +73,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             )
         )
     );
+    context.subscriptions.push(
+        vscode.commands.registerCommand(
+            'stc-extension.addFileToGroup',
+            (item) => handleAddFileToGroup(item)
+        )
+    );
+    context.subscriptions.push(
+        vscode.commands.registerCommand(
+            'stc-extension.removeFileFromGroup',
+            (item) => handleRemoveFileFromGroup(item)
+        )
+    );
 
     // 自动检测并加载工程
     await autoLoadProject();
@@ -154,6 +166,112 @@ async function handleCompileSingleFile(item?: any): Promise<void> {
     }
 
     await compiler.compileSingleFile(filePath);
+}
+
+async function handleAddFileToGroup(item: any): Promise<void> {
+    if (!currentUvprojPath) {
+        vscode.window.showWarningMessage('此操作仅适用于 Keil 工程（.uvproj）');
+        return;
+    }
+
+    const groupName: string = item?.label;
+    if (!groupName) {
+        return;
+    }
+
+    // 打开文件选择器
+    const files = await vscode.window.showOpenDialog({
+        title: `添加文件到分组 "${groupName}"`,
+        canSelectMany: true,
+        filters: {
+            '源文件': ['c', 'h', 'a51', 'asm', 'lib'],
+            '所有文件': ['*'],
+        },
+    });
+
+    if (!files || files.length === 0) {
+        return;
+    }
+
+    let success = 0;
+    for (const file of files) {
+        const ok = await uvprojParser.addFileToGroup(
+            currentUvprojPath,
+            groupName,
+            file.fsPath
+        );
+        if (ok) {
+            success++;
+        }
+    }
+
+    if (success > 0) {
+        // 重新解析工程以刷新树
+        const parsed = uvprojParser.parse(currentUvprojPath);
+        if (parsed) {
+            projectTreeProvider.setProject(parsed, true);
+        }
+        vscode.window.showInformationMessage(
+            `已添加 ${success} 个文件到分组 "${groupName}"`
+        );
+    }
+}
+
+async function handleRemoveFileFromGroup(item: any): Promise<void> {
+    if (!currentUvprojPath) {
+        vscode.window.showWarningMessage('此操作仅适用于 Keil 工程（.uvproj）');
+        return;
+    }
+
+    const filePath: string = item?.filePath;
+    if (!filePath) {
+        return;
+    }
+
+    // 获取当前工程数据以找到文件所属分组
+    const project = projectTreeProvider.getProject();
+    if (!project) {
+        return;
+    }
+
+    let groupName: string | undefined;
+    for (const group of project.groups) {
+        if (group.files.includes(filePath)) {
+            groupName = group.name;
+            break;
+        }
+    }
+
+    if (!groupName) {
+        vscode.window.showWarningMessage('找不到文件所属的分组');
+        return;
+    }
+
+    const confirm = await vscode.window.showWarningMessage(
+        `从分组 "${groupName}" 中移除 "${path.basename(filePath)}"？\n（不会删除磁盘文件）`,
+        { modal: true },
+        '确认移除'
+    );
+
+    if (confirm !== '确认移除') {
+        return;
+    }
+
+    const ok = await uvprojParser.removeFileFromGroup(
+        currentUvprojPath,
+        groupName,
+        filePath
+    );
+
+    if (ok) {
+        const parsed = uvprojParser.parse(currentUvprojPath);
+        if (parsed) {
+            projectTreeProvider.setProject(parsed, true);
+        }
+        vscode.window.showInformationMessage(
+            `已从分组 "${groupName}" 中移除 "${path.basename(filePath)}"`
+        );
+    }
 }
 
 async function handleSetToolchainPath(): Promise<void> {

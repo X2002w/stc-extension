@@ -205,12 +205,15 @@ export class StcProjectTreeProvider implements vscode.TreeDataProvider<StcTreeIt
                     vscode.TreeItemCollapsibleState.Expanded,
                     'section',
                     undefined,
-                    ungroupedFiles.map((f) => new StcTreeItem(
-                        path.basename(f),
-                        vscode.TreeItemCollapsibleState.None,
-                        path.extname(f).toLowerCase() === '.c' ? 'cSource' : 'asmSource',
-                        f
-                    ))
+                    ungroupedFiles.map((f) => {
+                        const ext = path.extname(f).toLowerCase();
+                        return new StcTreeItem(
+                            path.basename(f),
+                            vscode.TreeItemCollapsibleState.None,
+                            ext === '.c' ? 'ungroupedC' : 'ungroupedAsm',
+                            f
+                        );
+                    })
                 ));
             }
 

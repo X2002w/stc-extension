@@ -86,6 +86,16 @@
         "command": "stc-extension.configureC251",
         "title": "C251 编译选项",
         "icon": "$(settings-gear)"
+      },
+      {
+        "command": "stc-extension.addFileToGroup",
+        "title": "添加文件到分组",
+        "icon": "$(add)"
+      },
+      {
+        "command": "stc-extension.removeFileFromGroup",
+        "title": "从分组中移除",
+        "icon": "$(remove)"
       }
     ],
     "menus": {
@@ -124,6 +134,24 @@
         {
           "command": "stc-extension.compileSingleFile",
           "when": "view == stcProjectExplorer && viewItem == asmSource"
+        },
+        {
+          "command": "stc-extension.compileSingleFile",
+          "when": "view == stcProjectExplorer && viewItem == ungroupedC"
+        },
+        {
+          "command": "stc-extension.compileSingleFile",
+          "when": "view == stcProjectExplorer && viewItem == ungroupedAsm"
+        },
+        {
+          "command": "stc-extension.addFileToGroup",
+          "when": "view == stcProjectExplorer && viewItem == group",
+          "group": "inline"
+        },
+        {
+          "command": "stc-extension.removeFileFromGroup",
+          "when": "view == stcProjectExplorer && (viewItem == cSource || viewItem == asmSource)",
+          "group": "inline"
         }
       ]
     },
