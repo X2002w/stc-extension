@@ -99,7 +99,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     );
 
     // 自动检测并加载工程
-    await autoLoadProject();
+    const hasProject = await autoLoadProject();
 
     // 监听配置文件变化
     context.subscriptions.push(
@@ -110,8 +110,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         })
     );
 
-    // 设置文件系统监听，自动刷新工程树
-    setupFileWatchers(context);
+    // 始终监听工程文件变化（用于自动加载 / 切换工程）
+    setupProjectFileWatchers(context);
+
+    // 仅在已有工程时启用轮询文件监听（避免大目录下持续高开销扫描）
+    if (hasProject) {
+        setupPollingWatcher(context);
+    }
 
     vscode.window.showInformationMessage('STC Extension 已激活');
 }
@@ -567,9 +572,9 @@ async function ensureProject(): Promise<
 }
 
 /**
- * 激活时自动加载工程
+ * 激活时自动加载工程，返回 true 表示成功加载了工程
  */
-async function autoLoadProject(): Promise<void> {
+async function autoLoadProject(): Promise<boolean> {
     const uvprojPath = await uvprojParser.findProjectFile();
     if (uvprojPath) {
         const parsed = uvprojParser.parse(uvprojPath);
@@ -579,7 +584,7 @@ async function autoLoadProject(): Promise<void> {
             vscode.window.showInformationMessage(
                 `已加载 Keil 工程: ${parsed.name} (${parsed.device})`
             );
-            return;
+            return true;
         }
     }
 
@@ -645,15 +650,14 @@ async function autoLoadProject(): Promise<void> {
                     l251Classes: '',
                 };
                 projectTreeProvider.setProject(project, false);
-                return;
+                return true;
             } catch {
                 // 配置文件解析失败，回退到自动扫描
             }
         }
     }
 
-    // 最终回退：自动扫描模式
-    projectTreeProvider.refresh();
+    return false;
 }
 
 /**
@@ -730,9 +734,64 @@ function getC251Config(): {
 }
 
 /**
- * 设置文件轮询，每 300ms 扫描项目目录检测文件增删，自动刷新工程树
+ * 监听工程文件（.uvproj / .uvprojx）的增删改，自动加载或切换工程
+ * 使用 VS Code 原生 FileSystemWatcher，开销极低，始终启用
  */
-function setupFileWatchers(context: vscode.ExtensionContext): void {
+function setupProjectFileWatchers(context: vscode.ExtensionContext): void {
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders || workspaceFolders.length === 0) {
+        return;
+    }
+
+    const onProjectChanged = (uri: vscode.Uri) => {
+        currentUvprojPath = uri.fsPath;
+        const parsed = uvprojParser.parse(uri.fsPath);
+        if (parsed) {
+            projectTreeProvider.setProject(parsed, true);
+            // 如果之前没有工程（没有启动轮询），现在检测到了工程，启动轮询
+            setupPollingWatcher(context);
+        }
+    };
+
+    const onProjectCreated = (uri: vscode.Uri) => {
+        // 工程文件新建时加载
+        onProjectChanged(uri);
+    };
+
+    const onProjectDeleted = () => {
+        currentUvprojPath = undefined;
+        projectTreeProvider.clearProject();
+    };
+
+    const projectWatcher = vscode.workspace.createFileSystemWatcher(
+        new vscode.RelativePattern(workspaceFolders[0], '**/*.uvproj')
+    );
+    projectWatcher.onDidChange(onProjectChanged);
+    projectWatcher.onDidCreate(onProjectCreated);
+    projectWatcher.onDidDelete(onProjectDeleted);
+    context.subscriptions.push(projectWatcher);
+
+    const projectWatcher2 = vscode.workspace.createFileSystemWatcher(
+        new vscode.RelativePattern(workspaceFolders[0], '**/*.uvprojx')
+    );
+    projectWatcher2.onDidChange(onProjectChanged);
+    projectWatcher2.onDidCreate(onProjectCreated);
+    projectWatcher2.onDidDelete(onProjectDeleted);
+    context.subscriptions.push(projectWatcher2);
+}
+
+let pollingWatcherSetup = false;
+
+/**
+ * 设置文件轮询，每 300ms 扫描项目目录检测文件增删，自动刷新工程树
+ * 仅在已加载工程时启用，避免在无工程的大目录下持续高开销扫描
+ */
+function setupPollingWatcher(context: vscode.ExtensionContext): void {
+    if (pollingWatcherSetup) {
+        return;
+    }
+    pollingWatcherSetup = true;
+
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders || workspaceFolders.length === 0) {
         return;
@@ -758,39 +817,11 @@ function setupFileWatchers(context: vscode.ExtensionContext): void {
     }, 300);
 
     context.subscriptions.push({
-        dispose: () => clearInterval(pollInterval),
+        dispose: () => {
+            clearInterval(pollInterval);
+            pollingWatcherSetup = false;
+        },
     });
-
-    // 额外监听 uvproj 文件内容变化（Keil 修改工程但不增减文件时触发）
-    const projectWatcher = vscode.workspace.createFileSystemWatcher(
-        new vscode.RelativePattern(workspaceFolders[0], '**/*.uvproj')
-    );
-    const projectWatcher2 = vscode.workspace.createFileSystemWatcher(
-        new vscode.RelativePattern(workspaceFolders[0], '**/*.uvprojx')
-    );
-
-    const onProjectChanged = (uri: vscode.Uri) => {
-        currentUvprojPath = uri.fsPath;
-        const parsed = uvprojParser.parse(uri.fsPath);
-        if (parsed) {
-            projectTreeProvider.setProject(parsed, true);
-        }
-    };
-
-    projectWatcher.onDidChange(onProjectChanged);
-    projectWatcher2.onDidChange(onProjectChanged);
-    projectWatcher.onDidCreate(onProjectChanged);
-    projectWatcher2.onDidCreate(onProjectChanged);
-
-    const onProjectDeleted = () => {
-        currentUvprojPath = undefined;
-        projectTreeProvider.clearProject();
-    };
-    projectWatcher.onDidDelete(onProjectDeleted);
-    projectWatcher2.onDidDelete(onProjectDeleted);
-
-    context.subscriptions.push(projectWatcher);
-    context.subscriptions.push(projectWatcher2);
 }
 
 /**

@@ -18,6 +18,7 @@
     "onCommand:stc-extension.configure",
     "onCommand:stc-extension.setToolchainPath",
     "onCommand:stc-extension.refreshProject",
+    "onStartupFinished",
     "onCommand:stc-extension.newProject",
     "workspaceContains:**/*.uvproj",
     "workspaceContains:**/*.uvprojx",
