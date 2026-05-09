@@ -164,9 +164,16 @@ export class StcProjectTreeProvider implements vscode.TreeDataProvider<StcTreeIt
                         continue;
                     }
                     const ext = path.extname(filePath).toLowerCase();
-                    const contextValue = (ext === '.a51' || ext === '.asm')
-                        ? 'asmSource'
-                        : 'cSource';
+                    let contextValue: string;
+                    if (ext === '.a51' || ext === '.asm') {
+                        contextValue = 'asmSource';
+                    } else if (ext === '.h') {
+                        contextValue = 'headerFile';
+                    } else if (ext === '.lib' || ext === '.obj') {
+                        contextValue = 'libFile';
+                    } else {
+                        contextValue = 'cSource';
+                    }
                     fileItems.push(new StcTreeItem(
                         path.basename(filePath),
                         vscode.TreeItemCollapsibleState.None,
@@ -217,13 +224,13 @@ export class StcProjectTreeProvider implements vscode.TreeDataProvider<StcTreeIt
                 ));
             }
 
-            // 额外分区：头文件、库文件
-            const headerFiles = this.findFiles('**/*.h');
-            const libFiles = this.findFiles('**/*.lib');
+            // 额外分区：头文件、库文件（排除已在分组中显示的）
+            const headerFiles = this.findFiles('**/*.h').filter((f) => !groupedFiles.has(f));
+            const libFiles = this.findFiles('**/*.lib').filter((f) => !groupedFiles.has(f));
 
             if (headerFiles.length > 0) {
                 groupChildren.push(new StcTreeItem(
-                    '头文件',
+                    '其他头文件',
                     vscode.TreeItemCollapsibleState.Collapsed,
                     'section',
                     undefined,
@@ -238,7 +245,7 @@ export class StcProjectTreeProvider implements vscode.TreeDataProvider<StcTreeIt
 
             if (libFiles.length > 0) {
                 groupChildren.push(new StcTreeItem(
-                    '库文件',
+                    '其他库文件',
                     vscode.TreeItemCollapsibleState.Collapsed,
                     'section',
                     undefined,

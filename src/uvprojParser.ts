@@ -273,11 +273,6 @@ export class UvprojParser {
                                 continue;
                             }
 
-                            // FileType 5 = 头文件，跳过（只在 IncludePath 中使用）
-                            if (fileType === '5') {
-                                continue;
-                            }
-
                             const realPath = this.resolveFilePath(
                                 projectDir,
                                 filePath,
