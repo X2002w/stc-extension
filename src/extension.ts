@@ -91,6 +91,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             (item) => handleRemoveFileFromGroup(item)
         )
     );
+    context.subscriptions.push(
+        vscode.commands.registerCommand(
+            'stc-extension.addGroup',
+            () => handleAddGroup()
+        )
+    );
 
     // 自动检测并加载工程
     await autoLoadProject();
@@ -220,6 +226,38 @@ async function handleAddFileToGroup(item: any): Promise<void> {
         vscode.window.showInformationMessage(
             `已添加 ${success} 个文件到分组 "${groupName}"`
         );
+    }
+}
+
+async function handleAddGroup(): Promise<void> {
+    if (!currentUvprojPath) {
+        vscode.window.showWarningMessage('此操作仅适用于 Keil 工程（.uvproj）');
+        return;
+    }
+
+    const groupName = await vscode.window.showInputBox({
+        title: '新建分组',
+        prompt: '请输入分组名称',
+        placeHolder: 'new_group',
+        validateInput: (value) => {
+            if (!value.trim()) {
+                return '分组名称不能为空';
+            }
+            return undefined;
+        },
+    });
+
+    if (!groupName) {
+        return;
+    }
+
+    const ok = await uvprojParser.addGroup(currentUvprojPath, groupName.trim());
+    if (ok) {
+        const parsed = uvprojParser.parse(currentUvprojPath);
+        if (parsed) {
+            projectTreeProvider.setProject(parsed, true);
+        }
+        vscode.window.showInformationMessage(`已创建分组 "${groupName.trim()}"`);
     }
 }
 

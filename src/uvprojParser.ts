@@ -419,6 +419,64 @@ export class UvprojParser {
     }
 
     /**
+     * 向 uvproj 工程文件中添加新分组
+     */
+    async addGroup(
+        uvprojPath: string,
+        newGroupName: string
+    ): Promise<boolean> {
+        try {
+            let xml = fs.readFileSync(uvprojPath, 'utf-8');
+
+            // 检查分组是否已存在
+            const escapedName = this.escapeRegex(newGroupName);
+            const existPattern = new RegExp(
+                `<GroupName>\\s*${escapedName}\\s*</GroupName>`
+            );
+            if (existPattern.test(xml)) {
+                vscode.window.showWarningMessage(`分组 "${newGroupName}" 已存在`);
+                return false;
+            }
+
+            // 定位 </Groups> 标签（在最后一个 </Group> 之后）
+            const groupsEnd = xml.indexOf('</Groups>');
+            if (groupsEnd < 0) return false;
+
+            // 从 </Groups> 往前找最后一个 </Group> 来检测缩进
+            const lastGroupEnd = xml.lastIndexOf('</Group>', groupsEnd);
+            if (lastGroupEnd < 0) return false;
+
+            // 检测缩进
+            const lineStart = xml.lastIndexOf('\n', lastGroupEnd) + 1;
+            const indent1 = xml.substring(lineStart, lineStart + (lastGroupEnd - lineStart));
+            const indent2 = indent1 + '\t';
+            const indent3 = indent2 + '\t';
+
+            // 构造新分组（含空 Files 节点，与 Keil 格式一致）
+            const newGroup = [
+                `${indent1}<Group>`,
+                `${indent2}<GroupName>${this.xmlEscape(newGroupName)}</GroupName>`,
+                `${indent2}<Files>`,
+                `${indent2}</Files>`,
+                `${indent1}</Group>`,
+            ].join('\n');
+
+            // 在 </Groups> 之前插入新分组
+            const newXml = xml.substring(0, groupsEnd) +
+                newGroup + '\n' + indent1 +
+                xml.substring(groupsEnd);
+
+            fs.writeFileSync(uvprojPath, newXml);
+            return true;
+        } catch (error) {
+            vscode.window.showErrorMessage(
+                `添加分组失败: ${error instanceof Error ? error.message : String(error)}`
+            );
+            return false;
+        }
+    }
+
+    /**
      * 从 uvproj 工程文件中删除指定分组中的文件（文本操作，保留原格式）
      */
     async removeFileFromGroup(

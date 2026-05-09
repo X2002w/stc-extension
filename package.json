@@ -101,6 +101,11 @@
         "command": "stc-extension.removeFileFromGroup",
         "title": "从分组中移除",
         "icon": "$(remove)"
+      },
+      {
+        "command": "stc-extension.addGroup",
+        "title": "新建分组",
+        "icon": "$(folder-add)"
       }
     ],
     "menus": {
@@ -147,6 +152,11 @@
         {
           "command": "stc-extension.compileSingleFile",
           "when": "view == stcProjectExplorer && viewItem == ungroupedAsm"
+        },
+        {
+          "command": "stc-extension.addGroup",
+          "when": "view == stcProjectExplorer && (viewItem == project || viewItem == group)",
+          "group": "navigation@0"
         },
         {
           "command": "stc-extension.addFileToGroup",
