@@ -22,6 +22,14 @@ export interface UvprojProject {
     l251Misc: string;
     l251DisableWarnings: string;  // 屏蔽的 L251 警告编号，如 "15,16,57"
     l251Classes: string;          // CLASSES 内存布局指令，如 "EDATA (0x0-0xFFF), HDATA (0x0-0xFFF)"
+    /** 从 uvproj 提取的独立 C251 编译设置（用于 VS Code 配置覆盖） */
+    memoryModel: string;        // 'small' | 'xsmall' | 'compact' | 'large' | ''
+    puMode: string;             // 'source' | 'binary' | ''
+    romSize: string;            // 'small' | 'compact' | 'medium' | 'large' | 'huge' | ''
+    xtalFrequency: number;      // MHz, 0 表示未设置
+    optimLevel: string;         // '0'-'9' | ''
+    optimEmphasis: string;      // 'SPEED' | 'SIZE' | ''
+    c251MiscControls: string;   // 原始 MiscControls (Keil uVision 自由文本, 不含优化/内存模型等自动标志)
 }
 
 export class UvprojParser {
@@ -121,12 +129,22 @@ export class UvprojParser {
             let defines: string[] = [];
             let includePaths: string[] = [];
 
+            // 独立设置字段（从 uvproj 提取，供 VS Code 配置覆盖）
+            let uvMemoryModel = '';
+            let uvPuMode = '';
+            let uvRomSize = '';
+            let uvXtalFrequency = 0;
+            let uvOptimLevel = '';
+            let uvOptimEmphasis = '';
+            let uvC251MiscControls = '';
+
             if (target251) {
                 // C251 编译器参数
                 const c251Node = this.findNode(target251, 'C251');
                 if (c251Node) {
                     const c251VC = this.findNode(c251Node, 'VariousControls');
-                    c251Misc = this.getText(c251VC, 'MiscControls') || '';
+                    uvC251MiscControls = this.getText(c251VC, 'MiscControls') || '';
+                    c251Misc = uvC251MiscControls;
 
                     const c251IncludePath = this.getText(c251VC, 'IncludePath') || '';
                     const c251Define = this.getText(c251VC, 'Define') || '';
@@ -137,12 +155,15 @@ export class UvprojParser {
                     );
                     defines = this.parseCommaList(c251Define);
 
-                    // 提取 C251 优化设置: Optim(优化级别) + SizSpd(0=size, 1=speed)
-                    const optimLevel = this.getText(c251Node, 'Optim');
-                    const sizSpd = this.getText(c251Node, 'SizSpd');
-                    if (optimLevel) {
+                    // 提取 C251 优化设置: Optim(优化级别) + SizSpd(0=SIZE, 1=SPEED)
+                    uvOptimLevel = this.getText(c251Node, 'Optim') || '';
+                    const sizSpd = this.getText(c251Node, 'SizSpd') || '';
+                    if (sizSpd === '0') { uvOptimEmphasis = 'SIZE'; }
+                    else if (sizSpd === '1') { uvOptimEmphasis = 'SPEED'; }
+
+                    if (uvOptimLevel) {
                         const emphasis = sizSpd === '0' ? 'size' : 'speed';
-                        const optimFlag = `optimize(${optimLevel}, ${emphasis})`;
+                        const optimFlag = `optimize(${uvOptimLevel}, ${emphasis})`;
                         c251Misc = optimFlag + (c251Misc ? ' ' + c251Misc : '');
                     }
                 }
@@ -177,11 +198,13 @@ export class UvprojParser {
 
                     const flags: string[] = [];
                     if (memoryModel && modelFlags[memoryModel]) {
-                        flags.push(modelFlags[memoryModel]);
+                        uvMemoryModel = modelFlags[memoryModel];
+                        flags.push(uvMemoryModel);
                     }
 
                     // uSrcBin=0 表示 BINARY 模式 (需要 modbin 控制字)
                     // uSrcBin=1 表示 SOURCE 模式 (C251 默认，不需要额外控制字)
+                    uvPuMode = (uSrcBin === '0') ? 'binary' : 'source';
                     if (uSrcBin === '0') {
                         flags.push('modbin');
                     }
@@ -191,6 +214,21 @@ export class UvprojParser {
 
                     const autoFlags = flags.join(' ');
                     c251Misc = autoFlags + (c251Misc ? ' ' + c251Misc : '');
+
+                    // 提取 RomSize → C251 rom() 指令
+                    const romSizeRaw = this.getText(target251Misc, 'RomSize');
+                    const romSizeMap: Record<string, string> = {
+                        '0': 'small', '1': 'compact', '2': 'medium', '3': 'large', '4': 'huge',
+                    };
+                    if (romSizeRaw && romSizeMap[romSizeRaw]) {
+                        uvRomSize = romSizeMap[romSizeRaw];
+                    }
+
+                    // 提取 XTAL (晶振频率 MHz)
+                    const xtalRaw = this.getText(target251Misc, 'XTAL');
+                    if (xtalRaw) {
+                        uvXtalFrequency = parseFloat(xtalRaw) || 0;
+                    }
 
                     // 从 OnChipMemories 生成 L251 CLASSES 指令（内存布局）
                     // C251 架构中 EDATA 和 HDATA 都映射到内部 IRAM
@@ -227,7 +265,7 @@ export class UvprojParser {
 
             // 如果 C251Misc 为空，给安全的默认值
             if (!c251Misc) {
-                c251Misc = 'xsmall';
+                c251Misc = 'large';
             }
 
             // === 5. 提取文件分组 ===
@@ -309,6 +347,13 @@ export class UvprojParser {
                 l251Misc,
                 l251DisableWarnings,
                 l251Classes,
+                memoryModel: uvMemoryModel,
+                puMode: uvPuMode,
+                romSize: uvRomSize,
+                xtalFrequency: uvXtalFrequency,
+                optimLevel: uvOptimLevel,
+                optimEmphasis: uvOptimEmphasis,
+                c251MiscControls: uvC251MiscControls,
             };
         } catch (error) {
             vscode.window.showErrorMessage(

@@ -549,17 +549,24 @@ async function ensureProject(): Promise<
         const parsed = uvprojParser.parse(uvprojPath);
         if (parsed) {
             currentUvprojPath = uvprojPath;
-            // 合并 VS Code 用户设置的额外头文件路径和宏定义
+            // 合并 VS Code 用户设置：VS Code 设置作为主要编译选项，uvproj 自定义标志追加
             const c251 = getC251Config();
-            const mergedIncludePaths = [...new Set([...parsed.includePaths, ...c251.includePaths])];
-            const mergedDefines = [...new Set([...parsed.defines, ...c251.defines])];
-            // 如果用户配置了额外的 c251Misc，追加到 Keil 的 c251Misc 后面
-            const extraMisc = vscode.workspace.getConfiguration('stc-extension').get<string>('c251Misc', '');
-            if (extraMisc && !parsed.c251Misc.includes(extraMisc)) {
-                parsed.c251Misc = parsed.c251Misc + ' ' + extraMisc;
+            let finalC251Misc = c251.controlString;
+            // 追加 uvproj 中 Keil uVision 用户自定义的其他控制标志
+            if (parsed.c251MiscControls) {
+                finalC251Misc = finalC251Misc + ' ' + parsed.c251MiscControls;
             }
-            parsed.includePaths = mergedIncludePaths;
-            parsed.defines = mergedDefines;
+            parsed.c251Misc = finalC251Misc;
+            // includePaths 和 defines：合并（uvproj + VS Code 用户设置，去重）
+            parsed.includePaths = [...new Set([...parsed.includePaths, ...c251.includePaths])];
+            parsed.defines = [...new Set([...parsed.defines, ...c251.defines])];
+            // 如果 VS Code 配置了晶振频率，自动添加 MAIN_Fosc 宏定义
+            if (c251.xtalFrequency > 0) {
+                const freqDefine = `MAIN_Fosc=${c251.xtalFrequency * 1000000}`;
+                if (!parsed.defines.some(d => d.startsWith('MAIN_Fosc='))) {
+                    parsed.defines.push(freqDefine);
+                }
+            }
             projectTreeProvider.setProject(parsed, true);
             return parsed;
         }
@@ -580,6 +587,21 @@ async function autoLoadProject(): Promise<boolean> {
         const parsed = uvprojParser.parse(uvprojPath);
         if (parsed) {
             currentUvprojPath = uvprojPath;
+            // 合并 VS Code 用户设置
+            const c251 = getC251Config();
+            let finalC251Misc = c251.controlString;
+            if (parsed.c251MiscControls) {
+                finalC251Misc = finalC251Misc + ' ' + parsed.c251MiscControls;
+            }
+            parsed.c251Misc = finalC251Misc;
+            parsed.includePaths = [...new Set([...parsed.includePaths, ...c251.includePaths])];
+            parsed.defines = [...new Set([...parsed.defines, ...c251.defines])];
+            if (c251.xtalFrequency > 0) {
+                const freqDefine = `MAIN_Fosc=${c251.xtalFrequency * 1000000}`;
+                if (!parsed.defines.some(d => d.startsWith('MAIN_Fosc='))) {
+                    parsed.defines.push(freqDefine);
+                }
+            }
             projectTreeProvider.setProject(parsed, true);
             vscode.window.showInformationMessage(
                 `已加载 Keil 工程: ${parsed.name} (${parsed.device})`
@@ -648,6 +670,13 @@ async function autoLoadProject(): Promise<boolean> {
                         : '',
                     l251DisableWarnings: '',
                     l251Classes: '',
+                    memoryModel: c251.memoryModel,
+                    puMode: c251.puMode,
+                    romSize: c251.romSize,
+                    xtalFrequency: c251.xtalFrequency,
+                    optimLevel: c251.optimLevel,
+                    optimEmphasis: c251.optimEmphasis,
+                    c251MiscControls: '',
                 };
                 projectTreeProvider.setProject(project, false);
                 return true;
@@ -662,35 +691,46 @@ async function autoLoadProject(): Promise<boolean> {
 
 /**
  * 从 VS Code 用户设置读取 C251 编译配置
+ * 返回独立设置字段 + 合并后的 controlString
  */
 function getC251Config(): {
     controlString: string;
     includePaths: string[];
     defines: string[];
+    memoryModel: string;
+    puMode: string;
+    romSize: string;
+    xtalFrequency: number;
+    optimLevel: string;
+    optimEmphasis: string;
 } {
     const config = vscode.workspace.getConfiguration('stc-extension');
+
+    // --- 读取各独立设置 ---
+    const memoryModel = config.get<string>('c251MemoryModel', 'LARGE');
     const emphasis = config.get<string>('c251OptimizeEmphasis', 'SPEED');
-    const memoryModel = config.get<string>('c251MemoryModel', 'XSMALL');
+    const optLevel = config.get<string>('c251OptimizeLevel', '0');
+    const warnLevel = config.get<string>('c251WarningLevel', '3');
     const defines = config.get<string[]>('c251Defines', []);
     const extraMisc = config.get<string>('c251Misc', '');
 
-    // 读取优化等级（DEFAULT 或 0-9）
-    const optLevel = config.get<string>('c251OptimizeLevel', '0');
+    // 新增 STC32G 配置项
+    const puMode = config.get<string>('c251PuMode', 'SOURCE');
+    const xtalFreq = config.get<number>('c251XtalFrequency', 35.0);
+    const romSize = config.get<string>('c251CodeRomSize', 'LARGE');
+    const intFrameSize = config.get<number>('c251InterruptFrameSize', 4);
+    const useOnChipRom = config.get<boolean>('c251UseOnChipRom', true);
+    const farAsHuge = config.get<boolean>('c251FarAsHugePointer', false);
 
-    // 读取警告等级（DEFAULT 或 0-3）
-    const warnLevel = config.get<string>('c251WarningLevel', '3');
-
-    // 解析 includePaths：支持 VS Code 配置数组和分号分隔字符串
+    // --- 解析 includePaths ---
     const rawPaths = config.get<string[]>('c251IncludePaths', []);
     const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     const includePaths: string[] = [];
     for (const raw of rawPaths) {
-        // 处理可能的合并路径（逗号或分号分隔）
         const parts = raw.split(/[;,]/).filter(Boolean);
         for (const part of parts) {
             const trimmed = part.trim().replace(/^["']|["']$/g, '');
             if (trimmed) {
-                // 相对路径转绝对路径
                 const absPath = path.isAbsolute(trimmed)
                     ? trimmed
                     : (workspaceRoot ? path.resolve(workspaceRoot, trimmed) : trimmed);
@@ -699,38 +739,76 @@ function getC251Config(): {
         }
     }
 
-    // 构建 C251 控制字符串
-    const controlParts = [memoryModel, 'INTR2'];
+    // --- 构建 C251 控制字符串 ---
+    // 注意：C251 V5.60 所有控制字必须小写！
+    const controlParts: string[] = [];
 
-    // 警告等级：DEFAULT → 不生成；0-3 → WARNINGLEVEL(n)
-    if (warnLevel !== 'DEFAULT') {
-        controlParts.push(`WARNINGLEVEL(${warnLevel})`);
+    // 1. Memory Model: small / xsmall / compact / large
+    if (memoryModel) {
+        controlParts.push(memoryModel.toLowerCase());
     }
 
+    // 2. PU Mode: source (默认) → 不生成；binary → modbin
+    if (puMode === 'BINARY') {
+        controlParts.push('modbin');
+    }
+
+    // 3. 中断帧大小: 4 → INTR2
+    if (intFrameSize === 4) {
+        controlParts.push('intr2');
+    }
+
+    // 4. ROM 大小: rom(small|compact|medium|large|huge)
+    if (romSize) {
+        controlParts.push(`rom(${romSize.toLowerCase()})`);
+    }
+
+    // 5. 优化等级
     if (optLevel === 'DEFAULT') {
-        // 默认优化：仅 SIZE 侧重时生成 OPTIMIZE(SIZE)；SPEED 不生成 OPTIMIZE
         if (emphasis === 'SIZE') {
             controlParts.push('OPTIMIZE(SIZE)');
         }
     } else {
-        // 指定优化等级：生成 OPTIMIZE(n, emphasis)
         controlParts.push(`OPTIMIZE(${optLevel},${emphasis})`);
     }
 
-    // 别名检查：关闭时生成 NOALIAS
+    // 6. 警告等级
+    if (warnLevel !== 'DEFAULT') {
+        controlParts.push(`WARNINGLEVEL(${warnLevel})`);
+    }
+
+    // 7. 别名检查：关闭时生成 NOALIAS
     const aliasChecking = config.get<boolean>('c251AliasChecking', true);
     if (!aliasChecking) {
         controlParts.push('NOALIAS');
     }
 
+    // 8. far=HUGE 指针
+    if (farAsHuge) {
+        controlParts.push('FAR=HUGE');
+    }
+
     controlParts.push('BROWSE');
+
+    // 9. 用户自定义额外控制参数
     if (extraMisc) {
         controlParts.push(extraMisc);
     }
-    // 去重
+
+    // 去重（保持顺序）
     const controlString = [...new Set(controlParts)].join(' ');
 
-    return { controlString, includePaths, defines };
+    return {
+        controlString,
+        includePaths,
+        defines,
+        memoryModel,
+        puMode,
+        romSize,
+        xtalFrequency: xtalFreq,
+        optimLevel: optLevel,
+        optimEmphasis: emphasis,
+    };
 }
 
 /**
