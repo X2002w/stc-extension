@@ -2,7 +2,7 @@
   "name": "stc-extension",
   "displayName": "STC32G12K128",
   "description": "VS Code 扩展，支持 STC32G12K128 单片机的 Keil C251 工程管理与编译",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "repository": "https://github.com/X2002w/stc-extension.git",
   "publisher": "liyan06",
   "engines": {
@@ -188,7 +188,19 @@
         "stc-extension.c251OptimizeLevel": {
           "type": "string",
           "default": "0",
-          "enum": ["DEFAULT", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9"],
+          "enum": [
+            "DEFAULT",
+            "0",
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "9"
+          ],
           "enumDescriptions": [
             "默认 — 使用编译器默认优化级别",
             "Level 0: 常量折叠 | Constant folding",
@@ -207,7 +219,10 @@
         "stc-extension.c251OptimizeEmphasis": {
           "type": "string",
           "default": "SPEED",
-          "enum": ["SPEED", "SIZE"],
+          "enum": [
+            "SPEED",
+            "SIZE"
+          ],
           "enumDescriptions": [
             "优先优化执行速度 | Favor execution speed",
             "优先优化代码体积 | Favor code size"
@@ -222,13 +237,24 @@
         "stc-extension.c251MemoryModel": {
           "type": "string",
           "default": "XSMALL",
-          "enum": ["SMALL", "XSMALL", "COMPACT", "LARGE"],
+          "enum": [
+            "SMALL",
+            "XSMALL",
+            "COMPACT",
+            "LARGE"
+          ],
           "description": "C251 内存模型"
         },
         "stc-extension.c251WarningLevel": {
           "type": "string",
           "default": "3",
-          "enum": ["DEFAULT", "0", "1", "2", "3"],
+          "enum": [
+            "DEFAULT",
+            "0",
+            "1",
+            "2",
+            "3"
+          ],
           "enumDescriptions": [
             "默认 — 不生成 WARNINGLEVEL 指令",
             "Warninglevel 0 — 禁用警告 | Disable warnings",
@@ -240,14 +266,20 @@
         },
         "stc-extension.c251IncludePaths": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "default": [],
           "markdownDescription": "C251 头文件包含路径 (相当于 Keil `INCDIR(...)`)\n\n支持相对路径（相对于工作区根目录）"
         },
         "stc-extension.c251Defines": {
           "type": "array",
-          "items": { "type": "string" },
-          "default": ["STC32G12K128"],
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "STC32G12K128"
+          ],
           "markdownDescription": "C251 预定义宏 (相当于 Keil `DEFINE(...)`)"
         },
         "stc-extension.c251Misc": {
