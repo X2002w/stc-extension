@@ -69,7 +69,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         vscode.commands.registerCommand('stc-extension.configureC251', () =>
             vscode.commands.executeCommand(
                 'workbench.action.openSettings',
-                '@ext:stc-dev.stc-extension c251'
+                '@ext:liyan06.stc-extension c251'
             )
         )
     );

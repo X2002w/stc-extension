@@ -1,6 +1,6 @@
 .vscode/**
 .vscode-test/**
-node_modules/**
+# node_modules 不在排除列表中 — vsce 默认只打包 dependencies，手动排除会导致运行时依赖缺失
 src/**
 tsconfig.json
 **/*.ts
