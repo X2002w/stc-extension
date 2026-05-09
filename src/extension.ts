@@ -549,17 +549,39 @@ async function ensureProject(): Promise<
         const parsed = uvprojParser.parse(uvprojPath);
         if (parsed) {
             currentUvprojPath = uvprojPath;
-            // 合并 VS Code 用户设置：VS Code 设置作为主要编译选项，uvproj 自定义标志追加
+            // 合并 VS Code 用户设置
+            // 策略：uvproj 工程文件设置为主，VS Code 设置为补充/覆盖
             const c251 = getC251Config();
-            let finalC251Misc = c251.controlString;
-            // 追加 uvproj 中 Keil uVision 用户自定义的其他控制标志
-            if (parsed.c251MiscControls) {
-                finalC251Misc = finalC251Misc + ' ' + parsed.c251MiscControls;
+
+            // c251Misc: uvproj 做主，追加用户自定义的额外控制参数和缺失的 STC32G 配置
+            let finalC251Misc = parsed.c251Misc;
+            const extraMisc = vscode.workspace.getConfiguration('stc-extension').get<string>('c251Misc', '');
+            if (extraMisc && !finalC251Misc.toLowerCase().includes(extraMisc.toLowerCase())) {
+                finalC251Misc += ' ' + extraMisc;
             }
+            // 补充 uvproj 中未包含的 rom() 指令
+            if (c251.romSize && !/rom\s*\(/i.test(finalC251Misc)) {
+                finalC251Misc = `rom(${c251.romSize.toLowerCase()}) ` + finalC251Misc;
+            }
+            // 补充 INTR2（STC32G 必须）
+            if (!/intr2/i.test(finalC251Misc)) {
+                finalC251Misc = 'intr2 ' + finalC251Misc;
+            }
+            // 补充 far=HUGE
+            if (c251.romSize === 'HUGE' && !/far\s*=\s*huge/i.test(finalC251Misc)) {
+                finalC251Misc = 'FAR=HUGE ' + finalC251Misc;
+            }
+            // 补充 modbin（binary 模式）
+            if (c251.puMode === 'BINARY' && !/modbin/i.test(finalC251Misc)) {
+                finalC251Misc = 'modbin ' + finalC251Misc;
+            }
+
             parsed.c251Misc = finalC251Misc;
+
             // includePaths 和 defines：合并（uvproj + VS Code 用户设置，去重）
             parsed.includePaths = [...new Set([...parsed.includePaths, ...c251.includePaths])];
             parsed.defines = [...new Set([...parsed.defines, ...c251.defines])];
+
             // 如果 VS Code 配置了晶振频率，自动添加 MAIN_Fosc 宏定义
             if (c251.xtalFrequency > 0) {
                 const freqDefine = `MAIN_Fosc=${c251.xtalFrequency * 1000000}`;
@@ -567,6 +589,7 @@ async function ensureProject(): Promise<
                     parsed.defines.push(freqDefine);
                 }
             }
+
             projectTreeProvider.setProject(parsed, true);
             return parsed;
         }
@@ -587,11 +610,21 @@ async function autoLoadProject(): Promise<boolean> {
         const parsed = uvprojParser.parse(uvprojPath);
         if (parsed) {
             currentUvprojPath = uvprojPath;
-            // 合并 VS Code 用户设置
+            // 合并 VS Code 用户设置（uvproj 为主，VS Code 为补充）
             const c251 = getC251Config();
-            let finalC251Misc = c251.controlString;
-            if (parsed.c251MiscControls) {
-                finalC251Misc = finalC251Misc + ' ' + parsed.c251MiscControls;
+            let finalC251Misc = parsed.c251Misc;
+            const extraMisc = vscode.workspace.getConfiguration('stc-extension').get<string>('c251Misc', '');
+            if (extraMisc && !finalC251Misc.toLowerCase().includes(extraMisc.toLowerCase())) {
+                finalC251Misc += ' ' + extraMisc;
+            }
+            if (c251.romSize && !/rom\s*\(/i.test(finalC251Misc)) {
+                finalC251Misc = `rom(${c251.romSize.toLowerCase()}) ` + finalC251Misc;
+            }
+            if (!/intr2/i.test(finalC251Misc)) {
+                finalC251Misc = 'intr2 ' + finalC251Misc;
+            }
+            if (c251.puMode === 'BINARY' && !/modbin/i.test(finalC251Misc)) {
+                finalC251Misc = 'modbin ' + finalC251Misc;
             }
             parsed.c251Misc = finalC251Misc;
             parsed.includePaths = [...new Set([...parsed.includePaths, ...c251.includePaths])];
