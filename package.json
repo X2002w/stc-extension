@@ -4,7 +4,7 @@
   "description": "VS Code 扩展，支持 STC32G12K128 单片机的 Keil C251 工程管理与编译",
   "version": "0.1.0",
   "repository": "https://github.com/X2002w/stc-extension.git",
-  "publisher": "liyan",
+  "publisher": "liyan06",
   "engines": {
     "vscode": "^1.119.0"
   },
