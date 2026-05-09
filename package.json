@@ -236,14 +236,20 @@
         },
         "stc-extension.c251MemoryModel": {
           "type": "string",
-          "default": "XSMALL",
+          "default": "LARGE",
           "enum": [
             "SMALL",
             "XSMALL",
             "COMPACT",
             "LARGE"
           ],
-          "description": "C251 内存模型"
+          "enumDescriptions": [
+            "SMALL — 变量默认在 data 区，指针 2 字节",
+            "XSMALL — 变量默认在 data 区，指针 4 字节",
+            "COMPACT — 变量默认在 pdata 区，指针 2 字节",
+            "LARGE — 变量默认在 xdata 区，指针 4 字节 (推荐 STC32G)"
+          ],
+          "description": "C251 内存模型 (Memory Model) — STC32G 推荐 LARGE 模式，变量默认分配到 xdata 区，指针为 4 字节（24 位地址），适配其大容量 RAM。"
         },
         "stc-extension.c251WarningLevel": {
           "type": "string",
@@ -286,6 +292,66 @@
           "type": "string",
           "default": "",
           "markdownDescription": "C251 额外编译器控制参数（附加到控制字符串末尾）\n\n如 `INTR2 DEBUG PRINT(.\\Out_File\\*.lst)`"
+        },
+        "stc-extension.c251PuMode": {
+          "type": "string",
+          "default": "SOURCE",
+          "enum": [
+            "SOURCE",
+            "BINARY"
+          ],
+          "enumDescriptions": [
+            "Source (251 native) — STC32G 推荐模式，生成 C251 原生指令集代码，支持 24 位地址和扩展特性",
+            "Binary (MODBIN) — 二进制兼容模式，兼容传统 8051 指令集，功能受限"
+          ],
+          "description": "PU 模式 | C251 指令模式 — STC32G 必须使用 Source 模式，若选 Binary 模式会导致功能受限。"
+        },
+        "stc-extension.c251XtalFrequency": {
+          "type": "number",
+          "default": 35.0,
+          "description": "系统时钟频率 (MHz) — 此参数影响延时函数、串口波特率计算等时序相关代码。建议修改为实际使用的频率（如常见的 24.0 或 30.0 MHz）。编译时会自动作为 MAIN_Fosc 宏定义传递给编译器。"
+        },
+        "stc-extension.c251CodeRomSize": {
+          "type": "string",
+          "default": "LARGE",
+          "enum": [
+            "SMALL",
+            "COMPACT",
+            "MEDIUM",
+            "LARGE",
+            "HUGE"
+          ],
+          "enumDescriptions": [
+            "SMALL — 最大 2KB 程序空间",
+            "COMPACT — 最大 64KB 程序空间",
+            "MEDIUM — 任意大小，使用 AJMP/ACALL 指令",
+            "LARGE — 任意大小，使用 LJMP/LCALL 指令 (推荐 STC32G 前 64KB Flash)",
+            "HUGE — 任意大小，使用 EJMP/ECALL 指令 (需配合 Code Banking 使用超过 64KB 的代码空间)"
+          ],
+          "description": "Code Rom Size | 代码 ROM 大小模式 — 适配 STC32G128KB Flash 的前 64KB 空间，如需使用超过 64KB 的代码空间，可配合 Code Banking 选择 HUGE。"
+        },
+        "stc-extension.c251InterruptFrameSize": {
+          "type": "integer",
+          "default": 4,
+          "enum": [
+            0,
+            4
+          ],
+          "enumDescriptions": [
+            "默认中断帧 — 不使用 INTR2",
+            "4 字节中断帧 (INTR2) — C251 架构中断函数默认需要 4 字节的栈帧，是 STC32G 的强制配置"
+          ],
+          "description": "4 Byte Interrupt Frame Size | 中断帧大小 — STC32G 必须设置为 4 字节（启用 INTR2），勾选后中断处理才能正常运行。"
+        },
+        "stc-extension.c251UseOnChipRom": {
+          "type": "boolean",
+          "default": true,
+          "description": "使用片上 ROM (Use On-chip Code ROM) — STC32G 代码默认从内部 Flash 启动。启用后映射外部 ROM，一般工程无需开启。"
+        },
+        "stc-extension.c251FarAsHugePointer": {
+          "type": "boolean",
+          "default": false,
+          "description": "将 far 指针视为 huge 指针 (Treat far pointer as huge pointer) — far 指针默认已支持 24 位寻址，启用后会增加代码体积，无特殊需求无需开启。"
         }
       }
     },
