@@ -296,9 +296,8 @@ export class UvprojParser {
                         }
                     }
                 }
-                if (files.length > 0) {
-                    fileGroups.push({ name: groupName, files });
-                }
+                // 即使空白分组也保留，以便树中显示
+                fileGroups.push({ name: groupName, files });
             }
 
             return {
