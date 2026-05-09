@@ -137,7 +137,7 @@
         },
         "stc-extension.c251OptimizeLevel": {
           "type": "string",
-          "default": "DEFAULT",
+          "default": "0",
           "enum": ["DEFAULT", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9"],
           "enumDescriptions": [
             "默认 — 使用编译器默认优化级别",
@@ -165,6 +165,19 @@
           "default": "XSMALL",
           "enum": ["SMALL", "XSMALL", "COMPACT", "LARGE"],
           "description": "C251 内存模型"
+        },
+        "stc-extension.c251WarningLevel": {
+          "type": "string",
+          "default": "3",
+          "enum": ["DEFAULT", "0", "1", "2", "3"],
+          "enumDescriptions": [
+            "默认 — 不生成 WARNINGLEVEL 指令",
+            "Warninglevel 0 — 禁用警告 | Disable warnings",
+            "Warninglevel 1 — 警告级别 1",
+            "Warninglevel 2 — 警告级别 2",
+            "Warninglevel 3 — 警告级别 3"
+          ],
+          "description": "C251 警告级别"
         },
         "stc-extension.c251IncludePaths": {
           "type": "array",

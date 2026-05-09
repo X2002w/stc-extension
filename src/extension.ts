@@ -411,7 +411,10 @@ function getC251Config(): {
     const extraMisc = config.get<string>('c251Misc', '');
 
     // 读取优化等级（DEFAULT 或 0-9）
-    const optLevel = config.get<string>('c251OptimizeLevel', 'DEFAULT');
+    const optLevel = config.get<string>('c251OptimizeLevel', '0');
+
+    // 读取警告等级（DEFAULT 或 0-3）
+    const warnLevel = config.get<string>('c251WarningLevel', '3');
 
     // 解析 includePaths：支持 VS Code 配置数组和分号分隔字符串
     const rawPaths = config.get<string[]>('c251IncludePaths', []);
@@ -433,7 +436,12 @@ function getC251Config(): {
     }
 
     // 构建 C251 控制字符串
-    const controlParts = [memoryModel, 'INTR2', `WARNINGLEVEL(3)`];
+    const controlParts = [memoryModel, 'INTR2'];
+
+    // 警告等级：DEFAULT → 不生成；0-3 → WARNINGLEVEL(n)
+    if (warnLevel !== 'DEFAULT') {
+        controlParts.push(`WARNINGLEVEL(${warnLevel})`);
+    }
 
     if (optLevel === 'DEFAULT') {
         // 默认优化：仅 SIZE 侧重时生成 OPTIMIZE(SIZE)；SPEED/BALANCED 不生成 OPTIMIZE
