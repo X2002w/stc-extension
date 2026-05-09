@@ -136,11 +136,23 @@
           "description": "Keil C251 工具链路径（C251.EXE, A251.EXE, L251.EXE, OH251.EXE 所在目录）"
         },
         "stc-extension.c251OptimizeLevel": {
-          "type": "integer",
-          "default": 0,
-          "minimum": 0,
-          "maximum": 8,
-          "description": "C251 代码优化级别 (0=无优化, 8=最大优化)"
+          "type": "string",
+          "default": "DEFAULT",
+          "enum": ["DEFAULT", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9"],
+          "enumDescriptions": [
+            "默认 — 使用编译器默认优化级别",
+            "Level 0: 常量折叠 | Constant folding",
+            "Level 1: + 死代码消除 | Dead code elimination",
+            "Level 2: + 访问优化 | Access optimization",
+            "Level 3: + 寄存器变量优化 | Register variables",
+            "Level 4: + 公共子表达式消除 | Common subexpression elimination",
+            "Level 5: + 局部死变量消除 | Dead local variable elimination",
+            "Level 6: + 常量传播 | Constant propagation",
+            "Level 7: + 公共尾代码合并 | Common tail merging",
+            "Level 8: + 公共块子程序打包 | Common block subroutine packing",
+            "Level 9: + 代码重排以最大化公共块 | Rearrange Code to maximize Common Blocks"
+          ],
+          "description": "C251 代码优化级别"
         },
         "stc-extension.c251OptimizeEmphasis": {
           "type": "string",

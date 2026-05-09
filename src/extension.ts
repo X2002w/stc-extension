@@ -405,11 +405,13 @@ function getC251Config(): {
     defines: string[];
 } {
     const config = vscode.workspace.getConfiguration('stc-extension');
-    const level = config.get<number>('c251OptimizeLevel', 0);
     const emphasis = config.get<string>('c251OptimizeEmphasis', 'SPEED');
     const memoryModel = config.get<string>('c251MemoryModel', 'XSMALL');
     const defines = config.get<string[]>('c251Defines', []);
     const extraMisc = config.get<string>('c251Misc', '');
+
+    // 读取优化等级（DEFAULT 或 0-9）
+    const optLevel = config.get<string>('c251OptimizeLevel', 'DEFAULT');
 
     // 解析 includePaths：支持 VS Code 配置数组和分号分隔字符串
     const rawPaths = config.get<string[]>('c251IncludePaths', []);
@@ -430,13 +432,25 @@ function getC251Config(): {
         }
     }
 
-    // 构建 C251 控制字符串: MODEL INTR2 WARNINGLEVEL(3) OPTIMIZE(L,EMPH) BROWSE [misc]
-    const parts = [memoryModel, 'INTR2', `WARNINGLEVEL(3)`, `OPTIMIZE(${level},${emphasis})`, 'BROWSE'];
-    if (extraMisc) {
-        parts.push(extraMisc);
+    // 构建 C251 控制字符串
+    const controlParts = [memoryModel, 'INTR2', `WARNINGLEVEL(3)`];
+
+    if (optLevel === 'DEFAULT') {
+        // 默认优化：仅 SIZE 侧重时生成 OPTIMIZE(SIZE)；SPEED/BALANCED 不生成 OPTIMIZE
+        if (emphasis === 'SIZE') {
+            controlParts.push('OPTIMIZE(SIZE)');
+        }
+    } else {
+        // 指定优化等级：生成 OPTIMIZE(n, emphasis)
+        controlParts.push(`OPTIMIZE(${optLevel},${emphasis})`);
     }
-    // 去重（如用户在 misc 中重复设置了相同指令）
-    const controlString = [...new Set(parts)].join(' ');
+
+    controlParts.push('BROWSE');
+    if (extraMisc) {
+        controlParts.push(extraMisc);
+    }
+    // 去重
+    const controlString = [...new Set(controlParts)].join(' ');
 
     return { controlString, includePaths, defines };
 }
