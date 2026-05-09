@@ -93,6 +93,11 @@
         "icon": "$(add)"
       },
       {
+        "command": "stc-extension.createFileInGroup",
+        "title": "新建文件到分组",
+        "icon": "$(new-file)"
+      },
+      {
         "command": "stc-extension.removeFileFromGroup",
         "title": "从分组中移除",
         "icon": "$(remove)"
@@ -146,12 +151,17 @@
         {
           "command": "stc-extension.addFileToGroup",
           "when": "view == stcProjectExplorer && viewItem == group",
-          "group": "inline"
+          "group": "navigation@1"
+        },
+        {
+          "command": "stc-extension.createFileInGroup",
+          "when": "view == stcProjectExplorer && viewItem == group",
+          "group": "navigation@2"
         },
         {
           "command": "stc-extension.removeFileFromGroup",
           "when": "view == stcProjectExplorer && (viewItem == cSource || viewItem == asmSource)",
-          "group": "inline"
+          "group": "navigation@1"
         }
       ]
     },

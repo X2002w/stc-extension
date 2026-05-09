@@ -81,6 +81,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     );
     context.subscriptions.push(
         vscode.commands.registerCommand(
+            'stc-extension.createFileInGroup',
+            (item) => handleCreateFileInGroup(item)
+        )
+    );
+    context.subscriptions.push(
+        vscode.commands.registerCommand(
             'stc-extension.removeFileFromGroup',
             (item) => handleRemoveFileFromGroup(item)
         )
@@ -214,6 +220,109 @@ async function handleAddFileToGroup(item: any): Promise<void> {
         vscode.window.showInformationMessage(
             `已添加 ${success} 个文件到分组 "${groupName}"`
         );
+    }
+}
+
+async function handleCreateFileInGroup(item: any): Promise<void> {
+    if (!currentUvprojPath) {
+        vscode.window.showWarningMessage('此操作仅适用于 Keil 工程（.uvproj）');
+        return;
+    }
+
+    const groupName: string = item?.label;
+    if (!groupName) {
+        return;
+    }
+
+    // 输入文件名
+    const fileName = await vscode.window.showInputBox({
+        title: `在分组 "${groupName}" 中新建文件`,
+        prompt: '请输入文件名（如 led.c、isr.a51）',
+        placeHolder: 'example.c',
+        validateInput: (value) => {
+            if (!value.trim()) {
+                return '文件名不能为空';
+            }
+            const ext = path.extname(value).toLowerCase();
+            if (!['.c', '.h', '.a51', '.asm'].includes(ext)) {
+                return '仅支持 .c / .h / .a51 / .asm 文件';
+            }
+            return undefined;
+        },
+    });
+
+    if (!fileName) {
+        return;
+    }
+
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders || workspaceFolders.length === 0) {
+        return;
+    }
+
+    const rootPath = workspaceFolders[0].uri.fsPath;
+    const uvprojDir = path.dirname(currentUvprojPath);
+
+    // 选择文件保存目录（默认 uvproj 所在目录）
+    const dirs = await vscode.window.showOpenDialog({
+        title: `选择 "${fileName}" 保存位置`,
+        canSelectFolders: true,
+        canSelectFiles: false,
+        canSelectMany: false,
+        defaultUri: vscode.Uri.file(uvprojDir),
+    });
+
+    if (!dirs || dirs.length === 0) {
+        return;
+    }
+
+    const targetDir = dirs[0].fsPath;
+    const fullPath = path.join(targetDir, fileName);
+
+    // 检查是否已存在
+    if (fs.existsSync(fullPath)) {
+        const overwrite = await vscode.window.showWarningMessage(
+            `文件 "${fileName}" 已存在，是否覆盖？`,
+            { modal: true },
+            '覆盖'
+        );
+        if (overwrite !== '覆盖') {
+            return;
+        }
+    }
+
+    // 根据扩展名生成模板内容
+    const ext = path.extname(fileName).toLowerCase();
+    let template = '';
+    if (ext === '.c') {
+        template = `#include "STC32G.h"\n\n`;
+    } else if (ext === '.h') {
+        const guard = fileName.toUpperCase().replace(/[^A-Z0-9]/g, '_') + '_';
+        template = `#ifndef ${guard}\n#define ${guard}\n\n\n#endif\n`;
+    } else {
+        template = `; ${fileName}\n`;
+    }
+
+    fs.writeFileSync(fullPath, template);
+
+    // 写入 uvproj 分组
+    const ok = await uvprojParser.addFileToGroup(
+        currentUvprojPath,
+        groupName,
+        fullPath
+    );
+
+    if (ok) {
+        const parsed = uvprojParser.parse(currentUvprojPath);
+        if (parsed) {
+            projectTreeProvider.setProject(parsed, true);
+        }
+        vscode.window.showInformationMessage(
+            `已在分组 "${groupName}" 中新建 "${fileName}"`
+        );
+        // 打开新文件
+        const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(fullPath));
+        await vscode.window.showTextDocument(doc);
     }
 }
 
