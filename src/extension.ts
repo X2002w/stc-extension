@@ -329,7 +329,14 @@ async function handleCreateFileInGroup(item: any): Promise<void> {
         }
     }
 
-    fs.writeFileSync(fullPath, '');
+    // 头文件添加保护模板
+    const ext = path.extname(fileName).toLowerCase();
+    if (ext === '.h') {
+        const guard = '_' + fileName.toUpperCase().replace(/[^A-Z0-9]/g, '_') + '_';
+        fs.writeFileSync(fullPath, `#ifndef ${guard}\n#define ${guard}\n\n\n#endif\n`);
+    } else {
+        fs.writeFileSync(fullPath, '');
+    }
 
     // 写入 uvproj 分组
     const ok = await uvprojParser.addFileToGroup(
