@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { XMLParser, XMLBuilder } from 'fast-xml-parser';
+import { XMLParser } from 'fast-xml-parser';
 
 export interface FileGroup {
     name: string;
@@ -335,76 +335,74 @@ export class UvprojParser {
     ): Promise<boolean> {
         try {
             const projectDir = path.dirname(uvprojPath);
-            const xmlContent = fs.readFileSync(uvprojPath, 'utf-8');
-            const parsed = this.xmlParser.parse(xmlContent);
+            let xml = fs.readFileSync(uvprojPath, 'utf-8');
 
-            // 定位 Groups 容器
-            const project = this.findNode(parsed, 'Project');
-            if (!project) return false;
-            const targets = this.findNode(project, 'Targets');
-            if (!targets) return false;
-            const target = this.findNode(targets, 'Target');
-            if (!target) return false;
-            const groups = this.findNode(target, 'Groups');
-            if (!groups) return false;
-
-            // 找到目标分组
-            let groupNodes = this.findNode(groups, 'Group');
-            if (!groupNodes) return false;
-            groupNodes = Array.isArray(groupNodes) ? groupNodes : [groupNodes];
-
-            const targetGroup = groupNodes.find(
-                (g: any) => this.getText(g, 'GroupName') === groupName
-            );
-            if (!targetGroup) return false;
-
-            // 构建文件节点
+            // 计算相对路径
             const relPath = path.relative(projectDir, filePath).replace(/\\/g, '/');
             const dir = path.dirname(relPath) + '/';
             const fileName = path.basename(filePath);
             const ext = path.extname(filePath).toLowerCase();
             const fileType = (ext === '.a51' || ext === '.asm') ? '2' : '1';
 
-            const newFile: any = {
-                FilePath: dir,
-                FileName: fileName,
-                FileType: fileType,
-            };
+            // 定位目标分组: <GroupName>groupName</GroupName>
+            const escapedGroup = this.escapeRegex(groupName);
+            const groupPattern = new RegExp(
+                `(<GroupName>\\s*${escapedGroup}\\s*</GroupName>)`
+            );
+            const groupMatch = xml.match(groupPattern);
+            if (!groupMatch || groupMatch.index === undefined) return false;
 
-            // 添加到 Files 列表
-            let filesNode = this.findNode(targetGroup, 'Files');
-            if (!filesNode) {
-                // 分组下没有 Files 节点，创建一个
-                filesNode = { File: newFile };
-                targetGroup.Files = filesNode;
-            } else {
-                let fileList = filesNode.File;
-                if (!fileList) {
-                    filesNode.File = newFile;
-                } else {
-                    fileList = Array.isArray(fileList) ? fileList : [fileList];
-                    fileList.push(newFile);
-                    filesNode.File = fileList;
-                }
+            const groupStart = groupMatch.index;
+            // Groups 不嵌套，直接找下一个 </Group>
+            const groupEnd = xml.indexOf('</Group>', groupStart);
+            if (groupEnd < 0) return false;
+
+            // 提取该分组内的文本片段
+            const groupContent = xml.substring(groupStart, groupEnd);
+
+            // 检查文件是否已在该分组中（只在当前分组内检查）
+            const escapedName = this.escapeRegex(fileName);
+            if (new RegExp(`<FileName>\\s*${escapedName}\\s*</FileName>`).test(groupContent)) {
+                return true;
             }
 
-            // 回写 XML
-            const builder = new XMLBuilder({
-                format: true,
-                ignoreAttributes: false,
-                attributeNamePrefix: '',
-                textNodeName: '#text',
-                suppressEmptyNode: true,
-            });
-            const newXml = builder.build(parsed);
+            // 检测缩进风格（从 GroupName 所在行获取）
+            const lineStart = xml.lastIndexOf('\n', groupStart) + 1;
+            const indent1 = xml.substring(lineStart, lineStart + (groupStart - lineStart));
+            const indent2 = indent1 + '\t';
+            const indent3 = indent2 + '\t';
+            const indent4 = indent3 + '\t';
 
-            // fast-xml-parser 生成 XML declaration 可能格式不同，规范化
-            const fixedXml = newXml.replace(
-                /<\?xml.*?\?>/,
-                '<?xml version="1.0" encoding="UTF-8"?>'
-            );
+            // 构造 File 节点
+            const fileEntry = [
+                `${indent3}<File>`,
+                `${indent4}<FilePath>${this.xmlEscape(dir)}</FilePath>`,
+                `${indent4}<FileName>${this.xmlEscape(fileName)}</FileName>`,
+                `${indent4}<FileType>${fileType}</FileType>`,
+                `${indent3}</File>`,
+            ].join('\n');
 
-            fs.writeFileSync(uvprojPath, fixedXml);
+            // 查找分组内的 <Files> 节点
+            const filesMatch = groupContent.match(/<Files>/);
+            let newXml: string;
+
+            if (filesMatch) {
+                // Files 节点存在，在 </Files> 之前插入新文件
+                const filesStart = groupStart + filesMatch.index!;
+                const filesEnd = xml.indexOf('</Files>', filesStart);
+                if (filesEnd < 0) return false;
+
+                newXml = xml.substring(0, filesEnd) + '\n' + fileEntry + '\n' + indent2 + xml.substring(filesEnd);
+            } else {
+                // 没有 Files 节点，在 </Group> 之前创建
+                newXml =
+                    xml.substring(0, groupEnd) +
+                    '\n' + indent2 + '<Files>' +
+                    '\n' + fileEntry + '\n' + indent2 + '</Files>\n' + indent1 +
+                    xml.substring(groupEnd);
+            }
+
+            fs.writeFileSync(uvprojPath, newXml);
             return true;
         } catch (error) {
             vscode.window.showErrorMessage(
@@ -415,8 +413,7 @@ export class UvprojParser {
     }
 
     /**
-     * 从 uvproj 工程文件中删除指定分组中的文件
-     * @returns 是否成功
+     * 从 uvproj 工程文件中删除指定分组中的文件（文本操作，保留原格式）
      */
     async removeFileFromGroup(
         uvprojPath: string,
@@ -424,63 +421,34 @@ export class UvprojParser {
         filePath: string
     ): Promise<boolean> {
         try {
-            const projectDir = path.dirname(uvprojPath);
-            const xmlContent = fs.readFileSync(uvprojPath, 'utf-8');
-            const parsed = this.xmlParser.parse(xmlContent);
-
-            // 定位 Groups 容器
-            const project = this.findNode(parsed, 'Project');
-            if (!project) return false;
-            const targets = this.findNode(project, 'Targets');
-            if (!targets) return false;
-            const target = this.findNode(targets, 'Target');
-            if (!target) return false;
-            const groups = this.findNode(target, 'Groups');
-            if (!groups) return false;
-
-            // 找到目标分组
-            let groupNodes = this.findNode(groups, 'Group');
-            if (!groupNodes) return false;
-            groupNodes = Array.isArray(groupNodes) ? groupNodes : [groupNodes];
-
-            const targetGroup = groupNodes.find(
-                (g: any) => this.getText(g, 'GroupName') === groupName
-            );
-            if (!targetGroup) return false;
-
-            const filesNode = this.findNode(targetGroup, 'Files');
-            if (!filesNode) return false;
-
-            let fileList = filesNode.File;
-            if (!fileList) return false;
-            fileList = Array.isArray(fileList) ? fileList : [fileList];
-
+            let xml = fs.readFileSync(uvprojPath, 'utf-8');
             const fileName = path.basename(filePath);
-            filesNode.File = fileList.filter((f: any) => {
-                const name = this.getText(f, 'FileName') || '';
-                return name !== fileName;
-            });
+            const escapedName = this.escapeRegex(fileName);
 
-            // 确保 File 数组不为空时不变成单个对象
-            if (Array.isArray(filesNode.File) && filesNode.File.length === 1) {
-                filesNode.File = filesNode.File[0];
-            }
-
-            // 回写 XML
-            const builder = new XMLBuilder({
-                format: true,
-                ignoreAttributes: false,
-                attributeNamePrefix: '',
-                textNodeName: '#text',
-                suppressEmptyNode: true,
-            });
-            const newXml = builder.build(parsed);
-            const fixedXml = newXml.replace(
-                /<\?xml.*?\?>/,
-                '<?xml version="1.0" encoding="UTF-8"?>'
+            // 定位文件条目: <FileName>fileName</FileName>
+            const namePattern = new RegExp(
+                `<FileName>\\s*${escapedName}\\s*</FileName>`,
+                'g'
             );
+            const nameMatch = namePattern.exec(xml);
+            if (!nameMatch || nameMatch.index === undefined) return false;
 
-            fs.writeFileSync(uvprojPath, fixedXml);
+            // 找到包含该 FileName 的 <File>...</File> 块
+            const fileNamePos = nameMatch.index;
+            const fileStart = xml.lastIndexOf('<File>', fileNamePos);
+            const fileEnd = xml.indexOf('</File>', fileNamePos);
+            if (fileStart < 0 || fileEnd < 0) return false;
+
+            // 包含 </File> 后的换行
+            let endPos = fileEnd + '</File>'.length;
+            if (xml[endPos] === '\r') endPos++;
+            if (xml[endPos] === '\n') endPos++;
+
+            const before = xml.substring(0, fileStart);
+            const after = xml.substring(endPos);
+            xml = before + after;
+
+            fs.writeFileSync(uvprojPath, xml);
             return true;
         } catch (error) {
             vscode.window.showErrorMessage(
@@ -488,6 +456,20 @@ export class UvprojParser {
             );
             return false;
         }
+    }
+
+    /** 转义 XML 特殊字符 */
+    private xmlEscape(s: string): string {
+        return s
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    /** 转义正则特殊字符 */
+    private escapeRegex(s: string): string {
+        return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
 
     /**
