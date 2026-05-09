@@ -332,7 +332,7 @@ async function handleCreateFileInGroup(item: any): Promise<void> {
     // 头文件添加保护模板
     const ext = path.extname(fileName).toLowerCase();
     if (ext === '.h') {
-        const guard = '_' + fileName.toUpperCase().replace(/[^A-Z0-9]/g, '_') + '_';
+        const guard = '__' + fileName.toUpperCase().replace(/[^A-Z0-9]/g, '_') + '_H__';
         fs.writeFileSync(fullPath, `#ifndef ${guard}\n#define ${guard}\n\n\n#endif\n`);
     } else {
         fs.writeFileSync(fullPath, '');
