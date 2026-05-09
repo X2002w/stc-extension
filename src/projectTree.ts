@@ -91,6 +91,15 @@ export class StcProjectTreeProvider implements vscode.TreeDataProvider<StcTreeIt
     }
 
     /**
+     * 清除工程数据，回退到自动扫描模式
+     */
+    clearProject(): void {
+        this.project = undefined;
+        this.fromKeil = false;
+        this.refresh();
+    }
+
+    /**
      * 刷新树
      */
     refresh(): void {
@@ -146,11 +155,14 @@ export class StcProjectTreeProvider implements vscode.TreeDataProvider<StcTreeIt
                 'project'
             );
 
-            // 按分组列出源文件
+            // 按分组列出源文件（跳过已不存在的文件）
             const groupChildren: StcTreeItem[] = [];
             for (const group of this.project.groups) {
                 const fileItems: StcTreeItem[] = [];
                 for (const filePath of group.files) {
+                    if (!fs.existsSync(filePath)) {
+                        continue;
+                    }
                     const ext = path.extname(filePath).toLowerCase();
                     const contextValue = (ext === '.a51' || ext === '.asm')
                         ? 'asmSource'
@@ -173,6 +185,34 @@ export class StcProjectTreeProvider implements vscode.TreeDataProvider<StcTreeIt
                 ));
             }
             rootItem.children = groupChildren;
+
+            // Keil 可能尚未保存 uvproj，扫描磁盘找出不在分组中的源文件
+            const groupedFiles = new Set<string>();
+            for (const group of this.project.groups) {
+                for (const f of group.files) {
+                    groupedFiles.add(f);
+                }
+            }
+            const diskSources = [
+                ...this.findFiles('**/*.c'),
+                ...this.findFiles('**/*.a51'),
+                ...this.findFiles('**/*.asm'),
+            ];
+            const ungroupedFiles = diskSources.filter((f) => !groupedFiles.has(f));
+            if (ungroupedFiles.length > 0) {
+                groupChildren.push(new StcTreeItem(
+                    '未归组源文件 (Keil 尚未保存)',
+                    vscode.TreeItemCollapsibleState.Expanded,
+                    'section',
+                    undefined,
+                    ungroupedFiles.map((f) => new StcTreeItem(
+                        path.basename(f),
+                        vscode.TreeItemCollapsibleState.None,
+                        path.extname(f).toLowerCase() === '.c' ? 'cSource' : 'asmSource',
+                        f
+                    ))
+                ));
+            }
 
             // 额外分区：头文件、库文件
             const headerFiles = this.findFiles('**/*.h');

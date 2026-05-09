@@ -81,6 +81,11 @@
         "command": "stc-extension.compileSingleFile",
         "title": "编译当前文件",
         "icon": "$(file-code)"
+      },
+      {
+        "command": "stc-extension.configureC251",
+        "title": "C251 编译选项",
+        "icon": "$(settings-gear)"
       }
     ],
     "menus": {
@@ -99,6 +104,11 @@
           "command": "stc-extension.clean",
           "when": "view == stcProjectExplorer",
           "group": "navigation@3"
+        },
+        {
+          "command": "stc-extension.configureC251",
+          "when": "view == stcProjectExplorer",
+          "group": "navigation@4"
         },
         {
           "command": "stc-extension.refreshProject",
@@ -124,6 +134,42 @@
           "type": "string",
           "default": "F:\\MPU\\C251\\",
           "description": "Keil C251 工具链路径（C251.EXE, A251.EXE, L251.EXE, OH251.EXE 所在目录）"
+        },
+        "stc-extension.c251OptimizeLevel": {
+          "type": "integer",
+          "default": 0,
+          "minimum": 0,
+          "maximum": 8,
+          "description": "C251 代码优化级别 (0=无优化, 8=最大优化)"
+        },
+        "stc-extension.c251OptimizeEmphasis": {
+          "type": "string",
+          "default": "SPEED",
+          "enum": ["SPEED", "BALANCED", "SIZE"],
+          "description": "C251 优化侧重 (SPEED=速度, BALANCED=平衡, SIZE=体积)"
+        },
+        "stc-extension.c251MemoryModel": {
+          "type": "string",
+          "default": "XSMALL",
+          "enum": ["SMALL", "XSMALL", "COMPACT", "LARGE"],
+          "description": "C251 内存模型"
+        },
+        "stc-extension.c251IncludePaths": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "markdownDescription": "C251 头文件包含路径 (相当于 Keil `INCDIR(...)`)\n\n支持相对路径（相对于工作区根目录）"
+        },
+        "stc-extension.c251Defines": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["STC32G12K128"],
+          "markdownDescription": "C251 预定义宏 (相当于 Keil `DEFINE(...)`)"
+        },
+        "stc-extension.c251Misc": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "C251 额外编译器控制参数（附加到控制字符串末尾）\n\n如 `INTR2 DEBUG PRINT(.\\Out_File\\*.lst)`"
         }
       }
     },

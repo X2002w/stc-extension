@@ -10,6 +10,7 @@ let projectTreeProvider: StcProjectTreeProvider;
 let uvprojParser: UvprojParser;
 let compiler: StcCompiler;
 let taskProvider: vscode.Disposable | undefined;
+let currentUvprojPath: string | undefined;
 
 /**
  * 扩展激活
@@ -64,6 +65,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             handleCompileSingleFile(item)
         )
     );
+    context.subscriptions.push(
+        vscode.commands.registerCommand('stc-extension.configureC251', () =>
+            vscode.commands.executeCommand(
+                'workbench.action.openSettings',
+                '@ext:stc-dev.stc-extension c251'
+            )
+        )
+    );
 
     // 自动检测并加载工程
     await autoLoadProject();
@@ -76,6 +85,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             }
         })
     );
+
+    // 设置文件系统监听，自动刷新工程树
+    setupFileWatchers(context);
 
     vscode.window.showInformationMessage('STC Extension 已激活');
 }
@@ -200,16 +212,17 @@ async function handleNewProject(): Promise<void> {
     }
 
     // 创建 stc-project.json
+    const c251 = getC251Config();
     const projectConfig = {
         name: projectName,
         toolchainPath: vscode.workspace
             .getConfiguration('stc-extension')
             .get<string>('toolchainPath') || 'F:\\MPU\\C251\\',
         sources: ['src/**/*.c'],
-        headers: ['include/**/*.h'],
+        headers: c251.includePaths.map((p) => path.relative(rootPath, p).replace(/\\/g, '/') || p),
         assembler: [],
         libraries: [],
-        defines: ['STC32G12K128', 'FOSC_24000000'],
+        defines: c251.defines,
         output: {
             name: 'output',
             hex: true,
@@ -270,6 +283,18 @@ async function ensureProject(): Promise<
     if (uvprojPath) {
         const parsed = uvprojParser.parse(uvprojPath);
         if (parsed) {
+            currentUvprojPath = uvprojPath;
+            // 合并 VS Code 用户设置的额外头文件路径和宏定义
+            const c251 = getC251Config();
+            const mergedIncludePaths = [...new Set([...parsed.includePaths, ...c251.includePaths])];
+            const mergedDefines = [...new Set([...parsed.defines, ...c251.defines])];
+            // 如果用户配置了额外的 c251Misc，追加到 Keil 的 c251Misc 后面
+            const extraMisc = vscode.workspace.getConfiguration('stc-extension').get<string>('c251Misc', '');
+            if (extraMisc && !parsed.c251Misc.includes(extraMisc)) {
+                parsed.c251Misc = parsed.c251Misc + ' ' + extraMisc;
+            }
+            parsed.includePaths = mergedIncludePaths;
+            parsed.defines = mergedDefines;
             projectTreeProvider.setProject(parsed, true);
             return parsed;
         }
@@ -289,6 +314,7 @@ async function autoLoadProject(): Promise<void> {
     if (uvprojPath) {
         const parsed = uvprojParser.parse(uvprojPath);
         if (parsed) {
+            currentUvprojPath = uvprojPath;
             projectTreeProvider.setProject(parsed, true);
             vscode.window.showInformationMessage(
                 `已加载 Keil 工程: ${parsed.name} (${parsed.device})`
@@ -327,6 +353,13 @@ async function autoLoadProject(): Promise<void> {
                             : [],
                     },
                 ];
+
+                // 合并 VS Code 用户设置
+                const c251 = getC251Config();
+                const jsonDefines = config.defines || [];
+                const jsonHeaders = (config.headers || []).map((h: string) => path.resolve(rootPath, h));
+                const jsonMisc = config.c251Misc || '';
+
                 const project = {
                     name: config.name || 'STCProject',
                     device: config.device || 'STC32G12K128',
@@ -338,14 +371,12 @@ async function autoLoadProject(): Promise<void> {
                         'F:\\MPU\\C251\\',
                     groups,
                     libraries: [],
-                    defines: config.defines || [],
-                    includePaths: config.headers
-                        ? config.headers.map((h: string) => path.resolve(rootPath, h))
-                        : [],
+                    defines: [...new Set([...jsonDefines, ...c251.defines])],
+                    includePaths: [...new Set([...jsonHeaders, ...c251.includePaths])],
                     outputDir: config.output?.name
                         ? path.join(rootPath, config.output.name)
                         : path.join(rootPath, 'output'),
-                    c251Misc: config.c251Misc || 'xsmall',
+                    c251Misc: jsonMisc || c251.controlString,
                     a251Misc: config.a251Misc || '',
                     l251Misc: config.linker
                         ? `RS(${config.linker.ramSize || 256}) PL(${config.linker.codeSize || 256})`
@@ -363,4 +394,156 @@ async function autoLoadProject(): Promise<void> {
 
     // 最终回退：自动扫描模式
     projectTreeProvider.refresh();
+}
+
+/**
+ * 从 VS Code 用户设置读取 C251 编译配置
+ */
+function getC251Config(): {
+    controlString: string;
+    includePaths: string[];
+    defines: string[];
+} {
+    const config = vscode.workspace.getConfiguration('stc-extension');
+    const level = config.get<number>('c251OptimizeLevel', 0);
+    const emphasis = config.get<string>('c251OptimizeEmphasis', 'SPEED');
+    const memoryModel = config.get<string>('c251MemoryModel', 'XSMALL');
+    const defines = config.get<string[]>('c251Defines', []);
+    const extraMisc = config.get<string>('c251Misc', '');
+
+    // 解析 includePaths：支持 VS Code 配置数组和分号分隔字符串
+    const rawPaths = config.get<string[]>('c251IncludePaths', []);
+    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const includePaths: string[] = [];
+    for (const raw of rawPaths) {
+        // 处理可能的合并路径（逗号或分号分隔）
+        const parts = raw.split(/[;,]/).filter(Boolean);
+        for (const part of parts) {
+            const trimmed = part.trim().replace(/^["']|["']$/g, '');
+            if (trimmed) {
+                // 相对路径转绝对路径
+                const absPath = path.isAbsolute(trimmed)
+                    ? trimmed
+                    : (workspaceRoot ? path.resolve(workspaceRoot, trimmed) : trimmed);
+                includePaths.push(absPath);
+            }
+        }
+    }
+
+    // 构建 C251 控制字符串: MODEL INTR2 WARNINGLEVEL(3) OPTIMIZE(L,EMPH) BROWSE [misc]
+    const parts = [memoryModel, 'INTR2', `WARNINGLEVEL(3)`, `OPTIMIZE(${level},${emphasis})`, 'BROWSE'];
+    if (extraMisc) {
+        parts.push(extraMisc);
+    }
+    // 去重（如用户在 misc 中重复设置了相同指令）
+    const controlString = [...new Set(parts)].join(' ');
+
+    return { controlString, includePaths, defines };
+}
+
+/**
+ * 设置文件轮询，每 300ms 扫描项目目录检测文件增删，自动刷新工程树
+ */
+function setupFileWatchers(context: vscode.ExtensionContext): void {
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders || workspaceFolders.length === 0) {
+        return;
+    }
+
+    const rootPath = workspaceFolders[0].uri.fsPath;
+    const watchExts = ['.c', '.h', '.a51', '.asm', '.lib', '.obj'];
+    let previousFiles = new Set(collectProjectFiles(rootPath, watchExts));
+
+    const pollInterval = setInterval(() => {
+        const currentFiles = new Set(collectProjectFiles(rootPath, watchExts));
+        if (setsDiffer(previousFiles, currentFiles)) {
+            previousFiles = currentFiles;
+            if (currentUvprojPath) {
+                const parsed = uvprojParser.parse(currentUvprojPath);
+                if (parsed) {
+                    projectTreeProvider.setProject(parsed, true);
+                }
+            } else {
+                projectTreeProvider.refresh();
+            }
+        }
+    }, 300);
+
+    context.subscriptions.push({
+        dispose: () => clearInterval(pollInterval),
+    });
+
+    // 额外监听 uvproj 文件内容变化（Keil 修改工程但不增减文件时触发）
+    const projectWatcher = vscode.workspace.createFileSystemWatcher(
+        new vscode.RelativePattern(workspaceFolders[0], '**/*.uvproj')
+    );
+    const projectWatcher2 = vscode.workspace.createFileSystemWatcher(
+        new vscode.RelativePattern(workspaceFolders[0], '**/*.uvprojx')
+    );
+
+    const onProjectChanged = (uri: vscode.Uri) => {
+        currentUvprojPath = uri.fsPath;
+        const parsed = uvprojParser.parse(uri.fsPath);
+        if (parsed) {
+            projectTreeProvider.setProject(parsed, true);
+        }
+    };
+
+    projectWatcher.onDidChange(onProjectChanged);
+    projectWatcher2.onDidChange(onProjectChanged);
+    projectWatcher.onDidCreate(onProjectChanged);
+    projectWatcher2.onDidCreate(onProjectChanged);
+
+    const onProjectDeleted = () => {
+        currentUvprojPath = undefined;
+        projectTreeProvider.clearProject();
+    };
+    projectWatcher.onDidDelete(onProjectDeleted);
+    projectWatcher2.onDidDelete(onProjectDeleted);
+
+    context.subscriptions.push(projectWatcher);
+    context.subscriptions.push(projectWatcher2);
+}
+
+/**
+ * 递归扫描项目目录，收集所有匹配扩展名的文件路径
+ */
+function collectProjectFiles(dir: string, extensions: string[]): string[] {
+    const results: string[] = [];
+    const skipDirs = new Set(['node_modules', 'out', 'build', 'output', '.git', '.svn']);
+    try {
+        const entries = fs.readdirSync(dir, { withFileTypes: true });
+        for (const entry of entries) {
+            const fullPath = path.join(dir, entry.name);
+            if (entry.isDirectory()) {
+                if (entry.name.startsWith('.') || skipDirs.has(entry.name)) {
+                    continue;
+                }
+                results.push(...collectProjectFiles(fullPath, extensions));
+            } else if (entry.isFile()) {
+                const ext = path.extname(entry.name).toLowerCase();
+                if (extensions.includes(ext)) {
+                    results.push(fullPath);
+                }
+            }
+        }
+    } catch {
+        // 忽略无权限目录
+    }
+    return results;
+}
+
+/**
+ * 判断两个 Set 是否有差异
+ */
+function setsDiffer(a: Set<string>, b: Set<string>): boolean {
+    if (a.size !== b.size) {
+        return true;
+    }
+    for (const item of a) {
+        if (!b.has(item)) {
+            return true;
+        }
+    }
+    return false;
 }
