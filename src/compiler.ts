@@ -275,6 +275,10 @@ export class StcCompiler {
                     `\n".\\${path.relative(workspaceRoot, path.join(project.outputDir, project.name))}" - ${errorCount} Error(s), ${warningCount} Warning(s).`
                 );
                 this.outputChannel.appendLine(`Build Time Elapsed:  ${elapsed}s`);
+
+                // 检测 L24 CPU 模式不兼容警告，提示解决方案
+                this.appendCpuModeHint(allOutput);
+
                 return true;
             }
         } catch (error) {
@@ -534,5 +538,32 @@ export class StcCompiler {
     private extractHexStatus(output: string): string | undefined {
         const match = output.match(/creating hex file from\s*.+/i);
         return match ? match[0].trim() : undefined;
+    }
+
+    /** 检测 L24 CPU 模式不兼容警告并给出说明 */
+    private appendCpuModeHint(output: string): void {
+        const l24Pattern = /\*\*\* WARNING L24: INCOMPATIBLE CPU MODE\s+MODULE:\s+(.+?)\s*\*\*\s+MODE:\s+BINARY MODE/gi;
+        const matches = output.matchAll(l24Pattern);
+        const binaryModules: string[] = [];
+        for (const m of matches) {
+            const moduleName = m[1]?.trim();
+            if (moduleName && !binaryModules.includes(moduleName)) {
+                binaryModules.push(moduleName);
+            }
+        }
+
+        if (binaryModules.length > 0) {
+            this.outputChannel.appendLine('');
+            this.outputChannel.appendLine('ℹ️  CPU 模式说明 (L24)');
+            this.outputChannel.appendLine('   以下文件由 A251 以 BINARY 模式汇编（STC32G 正常行为）：');
+            for (const mod of binaryModules) {
+                this.outputChannel.appendLine(`   - ${mod}`);
+            }
+            this.outputChannel.appendLine('');
+            this.outputChannel.appendLine('   STC32G 的启动文件 (START251.A51) 使用 BINARY 模式汇编，');
+            this.outputChannel.appendLine('   而 C 代码使用 SOURCE 模式编译。这种混合模式是 STC32G 的');
+            this.outputChannel.appendLine('   正常设计，Keil uVision 中同样存在此警告，不影响程序运行。');
+            this.outputChannel.appendLine('');
+        }
     }
 }
