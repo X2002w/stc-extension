@@ -105,11 +105,18 @@ export class StcCompiler {
             if (a251Ctrl) {
                 this.outputChannel.appendLine(`[A251] ${a251Ctrl}`);
             }
-            // L251
+            // L251: 输出文件路径（相对工作区，与 Keil 格式一致）
+            const outputDirRel = path.relative(workspaceRoot, project.outputDir) || '.';
+            const absRelPath = '.\\' + path.join(outputDirRel, project.name + '.abs');
+            const mapRelPath = '.\\' + path.join(outputDirRel, project.name + '.map');
+
             const l251Summary: string[] = [];
+            l251Summary.push(`TO "${absRelPath}"`);
+            l251Summary.push(`PRINT("${mapRelPath}")`);
+            l251Summary.push('CASE');
             if (project.l251Misc) { l251Summary.push(project.l251Misc); }
-            if (project.l251Classes) { l251Summary.push(`CLASSES(${project.l251Classes})`); }
             if (project.l251DisableWarnings) { l251Summary.push(`DISABLEWARNING(${project.l251DisableWarnings})`); }
+            if (project.l251Classes) { l251Summary.push(`CLASSES(${project.l251Classes})`); }
             if (l251Summary.length > 0) {
                 this.outputChannel.appendLine(`[L251] ${l251Summary.join(' ')}`);
             }
@@ -202,15 +209,13 @@ export class StcCompiler {
                 // 生成链接控制文件（包含编译生成的 .obj 和预编译库/目标文件）
                 const allLinkFiles = [...objFiles, ...linkOnlyFiles];
                 const linkFile = path.join(project.outputDir, 'project.lin');
-                const absPath = path.join(project.outputDir, project.name + '.abs');
-                const mapPath = path.join(project.outputDir, project.name + '.map');
 
-                // 构建链接控制文件内容
+                // 构建链接控制文件内容（使用相对路径，与 Keil uVision 格式一致）
                 // 格式: obj列表 → TO → PRINT → CASE → DISABLEWARNING → WARNINGLEVEL → ... → CLASSES
                 const linkLines: string[] = [];
-                linkLines.push(allLinkFiles.map((f) => `"${f}"`).join(',\n'));
-                linkLines.push(`TO "${absPath}"`);
-                linkLines.push(`PRINT("${mapPath}")`);
+                linkLines.push(allLinkFiles.map((f) => `".\\${path.relative(workspaceRoot, f)}"`).join(',\n'));
+                linkLines.push(`TO "${absRelPath}"`);
+                linkLines.push(`PRINT("${mapRelPath}")`);
 
                 // CASE: 区分大小写链接（与 Keil uVision 行为一致）
                 linkLines.push('CASE');
