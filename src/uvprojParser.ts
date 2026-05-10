@@ -35,6 +35,7 @@ export interface UvprojProject {
     browseInfo: boolean;        // BrowseInfo 元素, "1"=生成浏览信息 (对应 BROWSE 控制字)
     debugInfo: boolean;         // Debug 元素, "1"=生成调试信息 (对应 DEBUG 控制字)
     aliasChecking: boolean;     // AliasChecking 元素, "0"=禁用别名检查 (对应 NOALIAS 控制字), 默认开启
+    hexFormat: string;          // 'HEX-80' | 'HEX-386', 从 TargetCommonOption 的 HexFormatSelection 提取
 }
 
 export class UvprojParser {
@@ -116,6 +117,12 @@ export class UvprojParser {
             // 输出目录
             const outputDirRaw = this.getText(tco, 'OutputDirectory') || '.\\output\\';
             const outputDir = path.resolve(projectDir, outputDirRaw);
+
+            // 提取 HEX 格式: HexFormatSelection: 0=HEX-80, 1=HEX-386
+            let uvHexFormat = 'HEX-386';  // STC32G 默认使用 HEX-386
+            const hexFormatSel = this.getText(tco, 'HexFormatSelection') || '';
+            if (hexFormatSel === '0') { uvHexFormat = 'HEX-80'; }
+            else if (hexFormatSel === '1') { uvHexFormat = 'HEX-386'; }
 
             // 从 TargetCommonOption 的 IncludePath 提取（如果 C251 下的为空则用它）
             const tcoIncludePathStr = this.getText(tco, 'IncludePath') || '';
@@ -387,6 +394,7 @@ export class UvprojParser {
                 browseInfo: uvBrowseInfo,
                 debugInfo: uvDebugInfo,
                 aliasChecking: uvAliasChecking,
+                hexFormat: uvHexFormat,
             };
         } catch (error) {
             vscode.window.showErrorMessage(

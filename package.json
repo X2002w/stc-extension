@@ -380,6 +380,16 @@
           "default": true,
           "description": "使用 Target Dialog 中的内存布局 (Use Memory Layout from Target Dialog) — 启用后根据 uvproj 中配置的片上内存生成 CLASSES 指令。"
         },
+        "stc-extension.hexFormat": {
+          "type": "string",
+          "default": "HEX-386",
+          "enum": ["HEX-80", "HEX-386"],
+          "enumDescriptions": [
+            "Intel HEX-80 — 标准 8/16 位地址格式",
+            "Intel HEX-386 — 32 位扩展地址格式，STC32G (80251 内核) 推荐"
+          ],
+          "description": "OH251 生成的 Intel HEX 文件格式。STC32G 使用 80251 扩展指令集，推荐使用 HEX-386 以支持 32 位地址空间。"
+        },
         "stc-extension.listingPageWidth": {
           "type": "integer",
           "default": 120,

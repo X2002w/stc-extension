@@ -739,6 +739,7 @@ async function autoLoadProject(): Promise<boolean> {
                     browseInfo: true,
                     debugInfo: true,
                     aliasChecking: true,
+                    hexFormat: vscode.workspace.getConfiguration('stc-extension').get<string>('hexFormat', 'HEX-386'),
                 };
                 projectTreeProvider.setProject(project, false);
                 return true;
