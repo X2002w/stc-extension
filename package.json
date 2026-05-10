@@ -433,6 +433,46 @@
           "type": "boolean",
           "default": false,
           "description": "链接器代码列表 (Linker Code Listing) — 启用后生成 .cod 文件，包含链接后的完整机器码和汇编指令，可用于逆向分析或优化。"
+        },
+        "stc-extension.a251DebugInfo": {
+          "type": "boolean",
+          "default": true,
+          "description": "A251 调试信息 (Debug Info) — 在目标文件中包含调试信息，用于源码级调试。"
+        },
+        "stc-extension.a251ExtendedProcessing": {
+          "type": "boolean",
+          "default": true,
+          "description": "A251 扩展处理 (EP / Extended Processing) — 启用 80251 扩展指令集处理，STC32G 必须开启。"
+        },
+        "stc-extension.a251MacroProcessor": {
+          "type": "string",
+          "default": "STANDARD",
+          "enum": [
+            "STANDARD",
+            "MPL",
+            "OFF"
+          ],
+          "enumDescriptions": [
+            "Standard — 标准宏处理器，支持常规汇编宏指令 (默认)",
+            "MPL — 高级宏处理模式，提供更复杂的宏功能",
+            "OFF — 禁用宏处理器"
+          ],
+          "description": "A251 宏处理器 (Macro Processor) — 控制汇编宏的处理方式。"
+        },
+        "stc-extension.a251CaseSensitive": {
+          "type": "boolean",
+          "default": false,
+          "description": "A251 区分大小写符号 (Case sensitive symbols) — 默认不区分大小写，与 Keil 汇编器行为一致。"
+        },
+        "stc-extension.a251ModSrc": {
+          "type": "boolean",
+          "default": true,
+          "description": "A251 修改源列表 (MODSRC) — 生成修改后的源文件列表，用于调试汇编过程。"
+        },
+        "stc-extension.a251Misc": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "A251 额外汇编器控制参数（附加到控制字符串末尾）\n\n如 `INCDIR(..\\..\\libraries\\zf_common) SET(LARGE)`"
         }
       }
     },

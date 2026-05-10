@@ -856,13 +856,56 @@ function getA251Config(): string {
     const config = vscode.workspace.getConfiguration('stc-extension');
     const parts: string[] = [];
 
-    // 页面格式
+    // 1. 宏处理器: STANDARD/MPL/OFF（OFF 时不添加）
+    const macroProc = config.get<string>('a251MacroProcessor', 'STANDARD');
+    if (macroProc === 'STANDARD') {
+        // Standard is default, no flag needed
+    } else if (macroProc === 'MPL') {
+        parts.push('MPL');
+    }
+    // OFF: NOMACRO or just skip
+
+    // 2. 区分大小写符号（默认不区分，即 CASEINSENSITIVE）
+    const caseSensitive = config.get<boolean>('a251CaseSensitive', false);
+    if (caseSensitive) {
+        parts.push('CASE');
+    }
+
+    // 3. 扩展处理 EP (80251 指令集必须)
+    const epEnabled = config.get<boolean>('a251ExtendedProcessing', true);
+    if (epEnabled) {
+        parts.push('EP');
+    }
+
+    // 4. 调试信息
+    const debugInfo = config.get<boolean>('a251DebugInfo', true);
+    if (debugInfo) {
+        parts.push('DEBUG');
+    }
+
+    // 5. SET 符号：根据内存模型定义 LARGE/SMALL/COMPACT 等条件汇编符号
+    const memoryModel = config.get<string>('c251MemoryModel', 'LARGE');
+    const setSymbolMap: Record<string, string> = {
+        'SMALL': 'SMALL', 'XSMALL': 'XSMALL', 'COMPACT': 'COMPACT', 'LARGE': 'LARGE',
+    };
+    const setSymbol = setSymbolMap[memoryModel];
+    if (setSymbol) {
+        parts.push(`SET(${setSymbol})`);
+    }
+
+    // 6. 修改源列表 MODSRC
+    const modSrc = config.get<boolean>('a251ModSrc', true);
+    if (modSrc) {
+        parts.push('MODSRC');
+    }
+
+    // 7. 页面格式
     const pageWidth = config.get<number>('listingPageWidth', 120);
     const pageLength = config.get<number>('listingPageLength', 65);
     if (pageWidth > 0) { parts.push(`PAGEWIDTH(${pageWidth})`); }
     if (pageLength > 0) { parts.push(`PAGELENGTH(${pageLength})`); }
 
-    // 汇编器列表
+    // 8. 汇编器列表
     const listingEnabled = config.get<boolean>('a251ListingEnabled', true);
     if (listingEnabled) {
         const listingOpts = config.get<string>('a251ListingOptions', 'COND SYMBOLS');
@@ -870,7 +913,14 @@ function getA251Config(): string {
         parts.push('PRINT(.\\out_file\\*.lst)');
     }
 
-    return parts.join(' ');
+    // 9. 用户自定义额外控制参数
+    const extraMisc = config.get<string>('a251Misc', '');
+    if (extraMisc) {
+        parts.push(extraMisc);
+    }
+
+    // 去重
+    return [...new Set(parts)].join(' ');
 }
 
 /**
