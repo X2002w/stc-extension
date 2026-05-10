@@ -30,6 +30,11 @@ export interface UvprojProject {
     optimLevel: string;         // '0'-'9' | ''
     optimEmphasis: string;      // 'SPEED' | 'SIZE' | ''
     c251MiscControls: string;   // 原始 MiscControls (Keil uVision 自由文本, 不含优化/内存模型等自动标志)
+    /** 从 uvproj C251 节点提取的独立 XML 元素（非 MiscControls） */
+    warningLevel: string;       // '0'-'3' Warnings 元素, 空字符串表示未设置 (对应 WARNINGLEVEL 控制字)
+    browseInfo: boolean;        // BrowseInfo 元素, "1"=生成浏览信息 (对应 BROWSE 控制字)
+    debugInfo: boolean;         // Debug 元素, "1"=生成调试信息 (对应 DEBUG 控制字)
+    aliasChecking: boolean;     // AliasChecking 元素, "0"=禁用别名检查 (对应 NOALIAS 控制字), 默认开启
 }
 
 export class UvprojParser {
@@ -137,6 +142,10 @@ export class UvprojParser {
             let uvOptimLevel = '';
             let uvOptimEmphasis = '';
             let uvC251MiscControls = '';
+            let uvWarningLevel = '';
+            let uvBrowseInfo = false;
+            let uvDebugInfo = false;
+            let uvAliasChecking = true;  // Keil 默认开启别名检查
 
             if (target251) {
                 // C251 编译器参数
@@ -165,6 +174,26 @@ export class UvprojParser {
                         const emphasis = sizSpd === '0' ? 'size' : 'speed';
                         const optimFlag = `optimize(${uvOptimLevel}, ${emphasis})`;
                         c251Misc = optimFlag + (c251Misc ? ' ' + c251Misc : '');
+                    }
+
+                    // 提取 C251 独立 XML 设置（Keil 不放在 MiscControls 中的单独元素）
+                    uvWarningLevel = this.getText(c251Node, 'Warnings') || '';
+                    uvBrowseInfo = this.getText(c251Node, 'BrowseInfo') === '1';
+                    uvDebugInfo = this.getText(c251Node, 'Debug') === '1';
+                    uvAliasChecking = this.getText(c251Node, 'AliasChecking') !== '0';
+
+                    // 将独立 XML 设置对应的控制字追加到 c251Misc
+                    if (uvWarningLevel && /^[0-3]$/.test(uvWarningLevel)) {
+                        c251Misc = c251Misc + ` warninglevel(${uvWarningLevel})`;
+                    }
+                    if (uvBrowseInfo) {
+                        c251Misc = c251Misc + ' browse';
+                    }
+                    if (uvDebugInfo) {
+                        c251Misc = c251Misc + ' debug';
+                    }
+                    if (!uvAliasChecking) {
+                        c251Misc = c251Misc + ' noalias';
                     }
                 }
 
@@ -354,6 +383,10 @@ export class UvprojParser {
                 optimLevel: uvOptimLevel,
                 optimEmphasis: uvOptimEmphasis,
                 c251MiscControls: uvC251MiscControls,
+                warningLevel: uvWarningLevel,
+                browseInfo: uvBrowseInfo,
+                debugInfo: uvDebugInfo,
+                aliasChecking: uvAliasChecking,
             };
         } catch (error) {
             vscode.window.showErrorMessage(

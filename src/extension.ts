@@ -735,6 +735,10 @@ async function autoLoadProject(): Promise<boolean> {
                     optimLevel: c251.optimLevel,
                     optimEmphasis: c251.optimEmphasis,
                     c251MiscControls: '',
+                    warningLevel: '',
+                    browseInfo: true,
+                    debugInfo: true,
+                    aliasChecking: true,
                 };
                 projectTreeProvider.setProject(project, false);
                 return true;
