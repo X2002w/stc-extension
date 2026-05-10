@@ -123,13 +123,17 @@ export class StcCompiler {
                 );
                 objFiles.push(objFile);
 
+                // 使用相对路径（相对于工程目录），与 Keil 一致，避免绝对路径嵌入 HEX
+                const asmFileRel = path.relative(projectDir, asmFile);
+                const objFileRel = path.relative(projectDir, objFile);
+                const lstFileRel = path.relative(projectDir, path.join(project.outputDir, asmBaseName + '.lst'));
+
                 const miscArgs = project.a251Misc || '';
-                const lstFile = path.join(project.outputDir, asmBaseName + '.lst');
                 const args = [
-                    asmFile,
+                    asmFileRel,
                     ...miscArgs.split(/\s+/),
-                    `PRINT(${lstFile})`,
-                    `object(${objFile})`,
+                    `PRINT(${lstFileRel})`,
+                    `object(${objFileRel})`,
                 ].filter((a) => a.length > 0);
 
                 this.outputChannel.appendLine(
@@ -165,11 +169,20 @@ export class StcCompiler {
                 );
                 objFiles.push(objFile);
 
-                const miscArgs = (project.c251Misc || 'xsmall').split(/\s+/).filter(Boolean);
+                // 使用相对路径（相对于工程目录），与 Keil 一致，避免绝对路径嵌入 HEX
+                const cFileRel = path.relative(projectDir, cFile);
+                const objFileRel = path.relative(projectDir, objFile);
+                const cBaseName = path.basename(cFile, '.c');
+                const cLstFileRel = path.relative(projectDir, path.join(project.outputDir, cBaseName + '.lst'));
+
+                const miscArgs = (project.c251Misc || 'xsmall')
+                    .split(/\s+/)
+                    .filter((a) => a.length > 0 && !/^print\s*\(/i.test(a)); // 移除含 * 通配符的 PRINT
                 const args = [
-                    cFile,
+                    cFileRel,
                     ...miscArgs,
-                    `object(${objFile})`,
+                    `PRINT(${cLstFileRel})`,
+                    `object(${objFileRel})`,
                 ];
 
                 this.outputChannel.appendLine(

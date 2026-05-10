@@ -186,23 +186,25 @@ export class UvprojParser {
                         c251Misc = optimFlag + (c251Misc ? ' ' + c251Misc : '');
                     }
 
-                    // 提取 C251 独立 XML 设置（Keil 不放在 MiscControls 中的单独元素）
-                    uvWarningLevel = this.getText(c251Node, 'Warnings') || '';
-                    uvBrowseInfo = this.getText(c251Node, 'BrowseInfo') === '1';
-                    uvDebugInfo = this.getText(c251Node, 'Debug') === '1';
-                    uvAliasChecking = this.getText(c251Node, 'AliasChecking') !== '0';
+                    // 提取 C251 独立 XML 设置（可能位于 C251 或 Target251 层级，两种格式都搜索）
+                    uvWarningLevel = this.getText(c251Node, 'Warnings') || this.getText(target251, 'Warnings') || '';
+                    uvBrowseInfo = this.getText(c251Node, 'BrowseInfo') === '1' || this.getText(target251, 'BrowseInfo') === '1';
+                    uvDebugInfo = this.getText(c251Node, 'Debug') === '1' || this.getText(target251, 'Debug') === '1';
+                    // AliasChecking: 搜索 C251 > Target251 > VariousControls 所有层级
+                    const aliasText = this.getText(c251Node, 'AliasChecking') || this.getText(target251, 'AliasChecking') || '';
+                    uvAliasChecking = aliasText === '' ? true : aliasText !== '0';
 
-                    // 将独立 XML 设置对应的控制字追加到 c251Misc
-                    if (uvWarningLevel && /^[0-3]$/.test(uvWarningLevel)) {
+                    // 将独立 XML 设置对应的控制字追加到 c251Misc（仅当 MiscControls 中未包含时避免重复）
+                    if (uvWarningLevel && /^[0-3]$/.test(uvWarningLevel) && !/\bwarninglevel/i.test(c251Misc)) {
                         c251Misc = c251Misc + ` warninglevel(${uvWarningLevel})`;
                     }
-                    if (uvBrowseInfo) {
+                    if (uvBrowseInfo && !/\bbrowse\b/i.test(c251Misc)) {
                         c251Misc = c251Misc + ' browse';
                     }
-                    if (uvDebugInfo) {
+                    if (uvDebugInfo && !/\bdebug\b/i.test(c251Misc)) {
                         c251Misc = c251Misc + ' debug';
                     }
-                    if (!uvAliasChecking) {
+                    if (!uvAliasChecking && !/\bnoalias\b/i.test(c251Misc)) {
                         c251Misc = c251Misc + ' noalias';
                     }
                 }
@@ -250,9 +252,6 @@ export class UvprojParser {
                     if (uSrcBin === '0') {
                         flags.push('modbin');
                     }
-
-                    // intr2: C251 中断向量格式（Keil 默认为 C251 项目添加）
-                    flags.push('intr2');
 
                     const autoFlags = flags.join(' ');
                     c251Misc = autoFlags + (c251Misc ? ' ' + c251Misc : '');

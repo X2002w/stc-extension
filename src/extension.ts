@@ -921,12 +921,30 @@ function applyVsCodeOverride(parsed: import('./uvprojParser').UvprojProject): vo
     if (extraMisc && !finalC251Misc.toLowerCase().includes(extraMisc.toLowerCase())) {
         finalC251Misc += ' ' + extraMisc;
     }
-    if (!/intr2/i.test(finalC251Misc)) {
-        finalC251Misc = 'intr2 ' + finalC251Misc;
-    }
     if (c251.puMode === 'BINARY' && !/modbin/i.test(finalC251Misc)) {
         finalC251Misc = 'modbin ' + finalC251Misc;
     }
+
+    // 补充 C251 缺失的关键标志（从 VS Code 设置读取，作为 uvproj 解析失败的兜底）
+    const config = vscode.workspace.getConfiguration('stc-extension');
+    const c251WarnLevel = config.get<string>('c251WarningLevel', '3');
+    if (c251WarnLevel !== 'DEFAULT' && !/warninglevel/i.test(finalC251Misc)) {
+        finalC251Misc += ` warninglevel(${c251WarnLevel})`;
+    }
+    if (!/noalias\b/i.test(finalC251Misc)) {
+        const aliasChecking = config.get<boolean>('c251AliasChecking', true);
+        if (!aliasChecking) {
+            finalC251Misc += ' noalias';
+        }
+    }
+    if (!/\bbrowse\b/i.test(finalC251Misc)) {
+        finalC251Misc += ' browse';
+    }
+    if (!/\bdebug\b/i.test(finalC251Misc)) {
+        finalC251Misc += ' debug';
+    }
+    // C251 PRINT 在 compiler.ts 中按文件动态生成（避免 * 通配符问题）
+
     parsed.c251Misc = finalC251Misc;
 
     // A251 合并：按 Keil 顺序重建控制字
@@ -1008,15 +1026,13 @@ function applyVsCodeOverride(parsed: import('./uvprojParser').UvprojProject): vo
     parsed.includePaths = [...new Set([...parsed.includePaths, ...c251.includePaths])];
     parsed.defines = [...new Set([...parsed.defines, ...c251.defines])];
 
-    // 将 INCDIR 和 DEFINE 合入 C251 控制字（与 Keil 格式一致，相对于工程目录）
+    // 将 INCDIR 合入 C251 控制字（与 Keil 格式一致）
+    // DEFINE 在 compiler.ts 中作为独立参数传递（Keil 不在控制字摘要中显示 DEFINE）
     if (parsed.includePaths.length > 0) {
         const relIncludes = parsed.includePaths
             .map(p => path.relative(projectBaseDir, p))
             .join(';');
         parsed.c251Misc += ` INCDIR(${relIncludes})`;
-    }
-    if (parsed.defines.length > 0) {
-        parsed.c251Misc += ` DEFINE(${parsed.defines.join(', ')})`;
     }
 
     // L251 屏蔽警告编号：VS Code 设置覆盖 uvproj
