@@ -582,14 +582,6 @@ async function ensureProject(): Promise<
                 parsed.l251DisableWarnings = vsL251DisableWarnings;
             }
 
-            // 晶振频率 → MAIN_Fosc 宏
-            if (c251.xtalFrequency > 0) {
-                const freqDefine = `MAIN_Fosc=${c251.xtalFrequency * 1000000}`;
-                if (!parsed.defines.some(d => d.startsWith('MAIN_Fosc='))) {
-                    parsed.defines.push(freqDefine);
-                }
-            }
-
             projectTreeProvider.setProject(parsed, true);
             return parsed;
         }
@@ -629,12 +621,6 @@ async function autoLoadProject(): Promise<boolean> {
             const vsL251DisableWarnings2 = vscode.workspace.getConfiguration('stc-extension').get<string>('l251DisableWarnings', '');
             if (vsL251DisableWarnings2) {
                 parsed.l251DisableWarnings = vsL251DisableWarnings2;
-            }
-            if (c251.xtalFrequency > 0) {
-                const freqDefine = `MAIN_Fosc=${c251.xtalFrequency * 1000000}`;
-                if (!parsed.defines.some(d => d.startsWith('MAIN_Fosc='))) {
-                    parsed.defines.push(freqDefine);
-                }
             }
             projectTreeProvider.setProject(parsed, true);
             vscode.window.showInformationMessage(
