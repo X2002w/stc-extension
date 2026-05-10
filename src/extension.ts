@@ -549,66 +549,7 @@ async function ensureProject(): Promise<
         const parsed = uvprojParser.parse(uvprojPath);
         if (parsed) {
             currentUvprojPath = uvprojPath;
-            // 策略：uvproj 工程设置为主，VS Code 只补充必需的 STC32G 项和用户额外参数
-            const c251 = getC251Config();
-
-            let finalC251Misc = parsed.c251Misc;
-            // 追加用户自定义的 c251Misc
-            const extraMisc = vscode.workspace.getConfiguration('stc-extension').get<string>('c251Misc', '');
-            if (extraMisc && !finalC251Misc.toLowerCase().includes(extraMisc.toLowerCase())) {
-                finalC251Misc += ' ' + extraMisc;
-            }
-            // 补充 INTR2（STC32G 必须，uvproj 中可能通过设备数据库隐式提供）
-            if (!/intr2/i.test(finalC251Misc)) {
-                finalC251Misc = 'intr2 ' + finalC251Misc;
-            }
-            // 只有用户显式切换到 BINARY 模式时才添加 modbin
-            if (c251.puMode === 'BINARY' && !/modbin/i.test(finalC251Misc)) {
-                finalC251Misc = 'modbin ' + finalC251Misc;
-            }
-            // 注意：rom() / FAR=HUGE 等指令会影响代码生成，不强制添加。
-            // uvproj 工程以 Keil 设备数据库和设备选择为准，
-            // 用户如需覆盖请通过 c251Misc 手动添加。
-
-            parsed.c251Misc = finalC251Misc;
-
-            // A251: uvproj 为主，补充 VS Code 中 uvproj 缺失的 STC32G 必要标志
-            const a251Cfg = getA251Config();
-            let finalA251Misc = parsed.a251Misc || '';
-            // 补充 EP（80251 扩展处理，STC32G 必须）
-            if (!/ep\b/i.test(finalA251Misc)) {
-                finalA251Misc = 'EP ' + finalA251Misc;
-            }
-            // 补充 DEBUG
-            if (!/\bdebug\b/i.test(finalA251Misc)) {
-                finalA251Misc += ' DEBUG';
-            }
-            // 补充 SET(LARGE/SMALL/COMPACT)（条件汇编符号）
-            if (!/set\s*\(/i.test(finalA251Misc)) {
-                const mm = c251.memoryModel || 'LARGE';
-                finalA251Misc += ` SET(${mm})`;
-            }
-            // 补充 MODSRC
-            if (!/\bmodsrc\b/i.test(finalA251Misc)) {
-                finalA251Misc += ' MODSRC';
-            }
-            // 追加用户自定义 a251Misc
-            const extraA251Misc = vscode.workspace.getConfiguration('stc-extension').get<string>('a251Misc', '');
-            if (extraA251Misc && !finalA251Misc.toLowerCase().includes(extraA251Misc.toLowerCase())) {
-                finalA251Misc += ' ' + extraA251Misc;
-            }
-            parsed.a251Misc = finalA251Misc;
-
-            // includePaths / defines：合并（uvproj + VS Code，去重）
-            parsed.includePaths = [...new Set([...parsed.includePaths, ...c251.includePaths])];
-            parsed.defines = [...new Set([...parsed.defines, ...c251.defines])];
-
-            // L251 屏蔽警告编号：VS Code 设置覆盖 uvproj（若用户自定义）
-            const vsL251DisableWarnings = vscode.workspace.getConfiguration('stc-extension').get<string>('l251DisableWarnings', '');
-            if (vsL251DisableWarnings) {
-                parsed.l251DisableWarnings = vsL251DisableWarnings;
-            }
-
+            applyVsCodeOverride(parsed);
             projectTreeProvider.setProject(parsed, true);
             return parsed;
         }
@@ -629,39 +570,7 @@ async function autoLoadProject(): Promise<boolean> {
         const parsed = uvprojParser.parse(uvprojPath);
         if (parsed) {
             currentUvprojPath = uvprojPath;
-            // uvproj 工程设置为主，VS Code 补充必需项
-            const c251 = getC251Config();
-            let finalC251Misc = parsed.c251Misc;
-            const extraMisc = vscode.workspace.getConfiguration('stc-extension').get<string>('c251Misc', '');
-            if (extraMisc && !finalC251Misc.toLowerCase().includes(extraMisc.toLowerCase())) {
-                finalC251Misc += ' ' + extraMisc;
-            }
-            if (!/intr2/i.test(finalC251Misc)) {
-                finalC251Misc = 'intr2 ' + finalC251Misc;
-            }
-            if (c251.puMode === 'BINARY' && !/modbin/i.test(finalC251Misc)) {
-                finalC251Misc = 'modbin ' + finalC251Misc;
-            }
-            parsed.c251Misc = finalC251Misc;
-            parsed.includePaths = [...new Set([...parsed.includePaths, ...c251.includePaths])];
-            parsed.defines = [...new Set([...parsed.defines, ...c251.defines])];
-
-            // A251: uvproj 为主，补充缺失的 STC32G 必要标志
-            let finalA251Misc = parsed.a251Misc || '';
-            if (!/ep\b/i.test(finalA251Misc)) { finalA251Misc = 'EP ' + finalA251Misc; }
-            if (!/\bdebug\b/i.test(finalA251Misc)) { finalA251Misc += ' DEBUG'; }
-            if (!/set\s*\(/i.test(finalA251Misc)) { finalA251Misc += ` SET(${c251.memoryModel || 'LARGE'})`; }
-            if (!/\bmodsrc\b/i.test(finalA251Misc)) { finalA251Misc += ' MODSRC'; }
-            const extraA251Misc2 = vscode.workspace.getConfiguration('stc-extension').get<string>('a251Misc', '');
-            if (extraA251Misc2 && !finalA251Misc.toLowerCase().includes(extraA251Misc2.toLowerCase())) {
-                finalA251Misc += ' ' + extraA251Misc2;
-            }
-            parsed.a251Misc = finalA251Misc;
-
-            const vsL251DisableWarnings2 = vscode.workspace.getConfiguration('stc-extension').get<string>('l251DisableWarnings', '');
-            if (vsL251DisableWarnings2) {
-                parsed.l251DisableWarnings = vsL251DisableWarnings2;
-            }
+            applyVsCodeOverride(parsed);
             projectTreeProvider.setProject(parsed, true);
             vscode.window.showInformationMessage(
                 `已加载 Keil 工程: ${parsed.name} (${parsed.device})`
@@ -1003,6 +912,50 @@ function getL251Config(): string {
 }
 
 /**
+ * 将 VS Code 用户设置合并到 uvproj 解析结果中（uvproj 为主，VS Code 补充缺失项）
+ * 所有工程加载路径（启动、手动构建、文件监听、轮询）都需调用此函数
+ */
+function applyVsCodeOverride(parsed: import('./uvprojParser').UvprojProject): void {
+    const c251 = getC251Config();
+
+    // C251 合并：补充 INTR2、BINARY 模式、用户自定义 extraMisc
+    let finalC251Misc = parsed.c251Misc;
+    const extraMisc = vscode.workspace.getConfiguration('stc-extension').get<string>('c251Misc', '');
+    if (extraMisc && !finalC251Misc.toLowerCase().includes(extraMisc.toLowerCase())) {
+        finalC251Misc += ' ' + extraMisc;
+    }
+    if (!/intr2/i.test(finalC251Misc)) {
+        finalC251Misc = 'intr2 ' + finalC251Misc;
+    }
+    if (c251.puMode === 'BINARY' && !/modbin/i.test(finalC251Misc)) {
+        finalC251Misc = 'modbin ' + finalC251Misc;
+    }
+    parsed.c251Misc = finalC251Misc;
+
+    // A251 合并：补充 EP、DEBUG、SET、MODSRC、用户自定义 extraMisc
+    let finalA251Misc = parsed.a251Misc || '';
+    if (!/ep\b/i.test(finalA251Misc)) { finalA251Misc = 'EP ' + finalA251Misc; }
+    if (!/\bdebug\b/i.test(finalA251Misc)) { finalA251Misc += ' DEBUG'; }
+    if (!/set\s*\(/i.test(finalA251Misc)) { finalA251Misc += ` SET(${c251.memoryModel || 'LARGE'})`; }
+    if (!/\bmodsrc\b/i.test(finalA251Misc)) { finalA251Misc += ' MODSRC'; }
+    const extraA251Misc = vscode.workspace.getConfiguration('stc-extension').get<string>('a251Misc', '');
+    if (extraA251Misc && !finalA251Misc.toLowerCase().includes(extraA251Misc.toLowerCase())) {
+        finalA251Misc += ' ' + extraA251Misc;
+    }
+    parsed.a251Misc = finalA251Misc;
+
+    // includePaths / defines 合并（去重）
+    parsed.includePaths = [...new Set([...parsed.includePaths, ...c251.includePaths])];
+    parsed.defines = [...new Set([...parsed.defines, ...c251.defines])];
+
+    // L251 屏蔽警告编号：VS Code 设置覆盖 uvproj
+    const vsL251DisableWarnings = vscode.workspace.getConfiguration('stc-extension').get<string>('l251DisableWarnings', '');
+    if (vsL251DisableWarnings) {
+        parsed.l251DisableWarnings = vsL251DisableWarnings;
+    }
+}
+
+/**
  * 监听工程文件（.uvproj / .uvprojx）的增删改，自动加载或切换工程
  * 使用 VS Code 原生 FileSystemWatcher，开销极低，始终启用
  */
@@ -1016,6 +969,7 @@ function setupProjectFileWatchers(context: vscode.ExtensionContext): void {
         currentUvprojPath = uri.fsPath;
         const parsed = uvprojParser.parse(uri.fsPath);
         if (parsed) {
+            applyVsCodeOverride(parsed);
             projectTreeProvider.setProject(parsed, true);
             // 如果之前没有工程（没有启动轮询），现在检测到了工程，启动轮询
             setupPollingWatcher(context);
@@ -1077,6 +1031,7 @@ function setupPollingWatcher(context: vscode.ExtensionContext): void {
             if (currentUvprojPath) {
                 const parsed = uvprojParser.parse(currentUvprojPath);
                 if (parsed) {
+                    applyVsCodeOverride(parsed);
                     projectTreeProvider.setProject(parsed, true);
                 }
             } else {

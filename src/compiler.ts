@@ -270,11 +270,11 @@ export class StcCompiler {
                     const omfFile = path.join(project.outputDir, project.name);
                     const hexFile = path.join(project.outputDir, project.name + '.hex');
 
-                    // HEX 格式: HEX-80 → HEXFILE, HEX-386 → HEX386
+                    // HEX 格式: HEX-80 → HEXFILE, HEX-386 → H386
                     const hexFormat = project.hexFormat || 'HEX-386';
                     const hexDirective = hexFormat === 'HEX-80'
                         ? `HEXFILE(${hexFile})`
-                        : `HEX386(${hexFile})`;
+                        : `H386(${hexFile})`;
                     this.outputChannel.appendLine(`[OH251] 生成 HEX (${hexFormat})...`);
                     const ohResult = await this.execTool(
                         this.toolPaths.get('OH251.EXE')!,
