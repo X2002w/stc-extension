@@ -89,6 +89,32 @@ export class StcCompiler {
                 ? [`define(${project.defines.join(', ')})`]
                 : [];
 
+            // --- 输出所有工具链控制字 ---
+            this.outputChannel.appendLine('=== 编译控制字 ===');
+            // C251
+            const c251Ctrl = (project.c251Misc || 'xsmall').trim();
+            this.outputChannel.appendLine(`[C251] ${c251Ctrl}`);
+            if (includeArgs.length > 0) {
+                this.outputChannel.appendLine(`       ${includeArgs.join(' ')}`);
+            }
+            if (defineArgs.length > 0) {
+                this.outputChannel.appendLine(`       ${defineArgs.join(' ')}`);
+            }
+            // A251
+            const a251Ctrl = (project.a251Misc || '').trim();
+            if (a251Ctrl) {
+                this.outputChannel.appendLine(`[A251] ${a251Ctrl}`);
+            }
+            // L251
+            const l251Summary: string[] = [];
+            if (project.l251Misc) { l251Summary.push(project.l251Misc); }
+            if (project.l251Classes) { l251Summary.push(`CLASSES(${project.l251Classes})`); }
+            if (project.l251DisableWarnings) { l251Summary.push(`DISABLEWARNING(${project.l251DisableWarnings})`); }
+            if (l251Summary.length > 0) {
+                this.outputChannel.appendLine(`[L251] ${l251Summary.join(' ')}`);
+            }
+            this.outputChannel.appendLine('');
+
             // 步骤1: 编译 C 源文件 (C251.EXE)
             const objFiles: string[] = [];
             for (const cFile of cFiles) {
