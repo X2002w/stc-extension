@@ -572,6 +572,33 @@ async function ensureProject(): Promise<
 
             parsed.c251Misc = finalC251Misc;
 
+            // A251: uvproj 为主，补充 VS Code 中 uvproj 缺失的 STC32G 必要标志
+            const a251Cfg = getA251Config();
+            let finalA251Misc = parsed.a251Misc || '';
+            // 补充 EP（80251 扩展处理，STC32G 必须）
+            if (!/ep\b/i.test(finalA251Misc)) {
+                finalA251Misc = 'EP ' + finalA251Misc;
+            }
+            // 补充 DEBUG
+            if (!/\bdebug\b/i.test(finalA251Misc)) {
+                finalA251Misc += ' DEBUG';
+            }
+            // 补充 SET(LARGE/SMALL/COMPACT)（条件汇编符号）
+            if (!/set\s*\(/i.test(finalA251Misc)) {
+                const mm = c251.memoryModel || 'LARGE';
+                finalA251Misc += ` SET(${mm})`;
+            }
+            // 补充 MODSRC
+            if (!/\bmodsrc\b/i.test(finalA251Misc)) {
+                finalA251Misc += ' MODSRC';
+            }
+            // 追加用户自定义 a251Misc
+            const extraA251Misc = vscode.workspace.getConfiguration('stc-extension').get<string>('a251Misc', '');
+            if (extraA251Misc && !finalA251Misc.toLowerCase().includes(extraA251Misc.toLowerCase())) {
+                finalA251Misc += ' ' + extraA251Misc;
+            }
+            parsed.a251Misc = finalA251Misc;
+
             // includePaths / defines：合并（uvproj + VS Code，去重）
             parsed.includePaths = [...new Set([...parsed.includePaths, ...c251.includePaths])];
             parsed.defines = [...new Set([...parsed.defines, ...c251.defines])];
@@ -618,6 +645,19 @@ async function autoLoadProject(): Promise<boolean> {
             parsed.c251Misc = finalC251Misc;
             parsed.includePaths = [...new Set([...parsed.includePaths, ...c251.includePaths])];
             parsed.defines = [...new Set([...parsed.defines, ...c251.defines])];
+
+            // A251: uvproj 为主，补充缺失的 STC32G 必要标志
+            let finalA251Misc = parsed.a251Misc || '';
+            if (!/ep\b/i.test(finalA251Misc)) { finalA251Misc = 'EP ' + finalA251Misc; }
+            if (!/\bdebug\b/i.test(finalA251Misc)) { finalA251Misc += ' DEBUG'; }
+            if (!/set\s*\(/i.test(finalA251Misc)) { finalA251Misc += ` SET(${c251.memoryModel || 'LARGE'})`; }
+            if (!/\bmodsrc\b/i.test(finalA251Misc)) { finalA251Misc += ' MODSRC'; }
+            const extraA251Misc2 = vscode.workspace.getConfiguration('stc-extension').get<string>('a251Misc', '');
+            if (extraA251Misc2 && !finalA251Misc.toLowerCase().includes(extraA251Misc2.toLowerCase())) {
+                finalA251Misc += ' ' + extraA251Misc2;
+            }
+            parsed.a251Misc = finalA251Misc;
+
             const vsL251DisableWarnings2 = vscode.workspace.getConfiguration('stc-extension').get<string>('l251DisableWarnings', '');
             if (vsL251DisableWarnings2) {
                 parsed.l251DisableWarnings = vsL251DisableWarnings2;
