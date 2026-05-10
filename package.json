@@ -2,7 +2,7 @@
   "name": "stc-extension",
   "displayName": "STC32G12K128",
   "description": "VS Code 扩展，支持 STC32G12K128 单片机的 Keil C251 工程管理与编译",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "repository": "https://github.com/X2002w/stc-extension.git",
   "publisher": "liyan06",
   "engines": {
@@ -308,7 +308,7 @@
         },
         "stc-extension.c251XtalFrequency": {
           "type": "number",
-          "default": 35.0,
+          "default": 35,
           "description": "系统时钟频率 (MHz) — 参考值，不自动注入宏定义。请在代码中使用 #define MAIN_Fosc 自行定义。此参数用于文档记录，建议修改为实际使用的频率（如 24.0 或 30.0 MHz）。"
         },
         "stc-extension.c251CodeRomSize": {
@@ -383,7 +383,10 @@
         "stc-extension.hexFormat": {
           "type": "string",
           "default": "HEX-386",
-          "enum": ["HEX-80", "HEX-386"],
+          "enum": [
+            "HEX-80",
+            "HEX-386"
+          ],
           "enumDescriptions": [
             "Intel HEX-80 — 标准 8/16 位地址格式",
             "Intel HEX-386 — 32 位扩展地址格式，STC32G (80251 内核) 推荐"
