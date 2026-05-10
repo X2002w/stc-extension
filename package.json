@@ -379,6 +379,60 @@
           "type": "boolean",
           "default": true,
           "description": "使用 Target Dialog 中的内存布局 (Use Memory Layout from Target Dialog) — 启用后根据 uvproj 中配置的片上内存生成 CLASSES 指令。"
+        },
+        "stc-extension.listingPageWidth": {
+          "type": "integer",
+          "default": 120,
+          "minimum": 72,
+          "maximum": 256,
+          "description": "列表文件页宽 (Page Width) — 控制 .lst/.map 等列表文件的每行字符数，方便打印/阅读。"
+        },
+        "stc-extension.listingPageLength": {
+          "type": "integer",
+          "default": 65,
+          "minimum": 10,
+          "maximum": 200,
+          "description": "列表文件页长 (Page Length) — 控制 .lst/.map 等列表文件的每页行数。"
+        },
+        "stc-extension.c251ListingEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "C 编译器列表 (C Compiler Listing) — 启用后生成 .lst 编译列表文件，包含 C 代码、条件编译展开、符号表、汇编输出等。"
+        },
+        "stc-extension.c251ListingOptions": {
+          "type": "string",
+          "default": "COND",
+          "markdownDescription": "C 编译器列表选项 (C Compiler Listing Options) — 空格分隔的控制字：\n\n- `COND` — 显示条件编译 (`#ifdef`/`#if`) 展开\n- `SYMBOLS` — 包含变量/函数符号表\n- `INCLUDE` — 包含头文件展开内容\n- `CODE` — 显示 C 代码对应的汇编输出\n- `NOCOND` / `NOSYMBOLS` / `NOINCLUDE` / `NOCODE` — 关闭对应选项\n\n默认: `COND`"
+        },
+        "stc-extension.c251PreprintEnabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "C 预处理器列表 (C Preprocessor Listing) — 启用后生成 .i 预处理输出文件，包含宏展开、头文件合并、条件编译后的结果，适合排查宏定义问题。"
+        },
+        "stc-extension.a251ListingEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "汇编器列表 (Assembler Listing) — 启用后生成 .lst 汇编列表文件。"
+        },
+        "stc-extension.a251ListingOptions": {
+          "type": "string",
+          "default": "COND SYMBOLS",
+          "markdownDescription": "汇编器列表选项 (Assembler Listing Options) — 空格分隔的控制字：\n\n- `COND` — 显示汇编条件指令 (`IF`/`IFDEF`) 展开\n- `SYMBOLS` — 包含汇编符号表 (标号、变量)\n- `MACRO` — 显示宏展开的最终代码\n- `MACROALL` — 显示宏展开的全部过程\n- `XREF` — 生成符号交叉引用表\n\n默认: `COND SYMBOLS`"
+        },
+        "stc-extension.l251MapEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "链接器列表 / Map 文件 (Linker Listing) — 启用后生成 .map 内存映射文件。"
+        },
+        "stc-extension.l251MapOptions": {
+          "type": "string",
+          "default": "MAP PUBLICS LOCALS LINES COMMENTS GENSYM LIBRARY",
+          "markdownDescription": "链接器 Map 文件选项 — 空格分隔的控制字：\n\n- `MAP` — 生成内存分布映射 (代码段/数据段/BSS 地址和大小)\n- `PUBLICS` — 包含全局符号地址信息\n- `LOCALS` — 包含静态/局部符号地址信息\n- `LINES` — 生成地址与源码行号对应关系\n- `COMMENTS` — 包含链接过程注释信息\n- `GENSYM` — 包含链接器自动生成的符号\n- `LIBRARY` — 包含库文件中被引用的符号\n- `XREF` — 生成符号交叉引用表\n\n默认: `MAP PUBLICS LOCALS LINES COMMENTS GENSYM LIBRARY`"
+        },
+        "stc-extension.l251CodeListingEnabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "链接器代码列表 (Linker Code Listing) — 启用后生成 .cod 文件，包含链接后的完整机器码和汇编指令，可用于逆向分析或优化。"
         }
       }
     },

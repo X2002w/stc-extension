@@ -684,11 +684,9 @@ async function autoLoadProject(): Promise<boolean> {
                         ? path.join(rootPath, config.output.name)
                         : path.join(rootPath, 'output'),
                     c251Misc: jsonMisc || c251.controlString,
-                    a251Misc: config.a251Misc || '',
-                    l251Misc: config.linker
-                        ? `RS(${config.linker.ramSize || 256}) PL(${config.linker.codeSize || 256})`
-                        : '',
-                    l251DisableWarnings: '',
+                    a251Misc: config.a251Misc || getA251Config(),
+                    l251Misc: getL251Config(),
+                    l251DisableWarnings: vscode.workspace.getConfiguration('stc-extension').get<string>('l251DisableWarnings', '57,16'),
                     l251Classes: '',
                     memoryModel: c251.memoryModel,
                     puMode: c251.puMode,
@@ -810,7 +808,27 @@ function getC251Config(): {
 
     controlParts.push('BROWSE');
 
-    // 9. 用户自定义额外控制参数
+    // 9. Listing 设置：页面格式
+    const pageWidth = config.get<number>('listingPageWidth', 120);
+    const pageLength = config.get<number>('listingPageLength', 65);
+    if (pageWidth > 0) { controlParts.push(`PAGEWIDTH(${pageWidth})`); }
+    if (pageLength > 0) { controlParts.push(`PAGELENGTH(${pageLength})`); }
+
+    // 10. C Compiler Listing: PRINT + 选项
+    const listingEnabled = config.get<boolean>('c251ListingEnabled', true);
+    if (listingEnabled) {
+        const listingOpts = config.get<string>('c251ListingOptions', 'COND');
+        if (listingOpts) { controlParts.push(listingOpts.toUpperCase()); }
+        controlParts.push('PRINT(.\\out_file\\*.lst)');
+    }
+
+    // 11. C Preprocessor Listing: PREPRINT
+    const preprEnabled = config.get<boolean>('c251PreprintEnabled', false);
+    if (preprEnabled) {
+        controlParts.push('PREPRINT(.\\out_file\\*.i)');
+    }
+
+    // 12. 用户自定义额外控制参数（附在最后，优先级最高）
     if (extraMisc) {
         controlParts.push(extraMisc);
     }
@@ -829,6 +847,64 @@ function getC251Config(): {
         optimLevel: optLevel,
         optimEmphasis: emphasis,
     };
+}
+
+/**
+ * 从 VS Code 用户设置读取 A251 汇编器配置（含 Listing 设置）
+ */
+function getA251Config(): string {
+    const config = vscode.workspace.getConfiguration('stc-extension');
+    const parts: string[] = [];
+
+    // 页面格式
+    const pageWidth = config.get<number>('listingPageWidth', 120);
+    const pageLength = config.get<number>('listingPageLength', 65);
+    if (pageWidth > 0) { parts.push(`PAGEWIDTH(${pageWidth})`); }
+    if (pageLength > 0) { parts.push(`PAGELENGTH(${pageLength})`); }
+
+    // 汇编器列表
+    const listingEnabled = config.get<boolean>('a251ListingEnabled', true);
+    if (listingEnabled) {
+        const listingOpts = config.get<string>('a251ListingOptions', 'COND SYMBOLS');
+        if (listingOpts) { parts.push(listingOpts.toUpperCase()); }
+        parts.push('PRINT(.\\out_file\\*.lst)');
+    }
+
+    return parts.join(' ');
+}
+
+/**
+ * 从 VS Code 用户设置读取 L251 链接器配置（含 Map 列表和 Code Listing 设置）
+ */
+function getL251Config(): string {
+    const config = vscode.workspace.getConfiguration('stc-extension');
+    const parts: string[] = [];
+
+    // REMOVEUNUSED: 移除未使用的函数/段
+    parts.push('REMOVEUNUSED');
+
+    // Map 文件选项
+    const mapEnabled = config.get<boolean>('l251MapEnabled', true);
+    if (mapEnabled) {
+        const mapOpts = config.get<string>('l251MapOptions', 'MAP PUBLICS LOCALS LINES COMMENTS GENSYM LIBRARY');
+        if (mapOpts) {
+            parts.push(mapOpts.toUpperCase());
+        }
+    }
+
+    // 页面格式
+    const pageWidth = config.get<number>('listingPageWidth', 120);
+    const pageLength = config.get<number>('listingPageLength', 65);
+    if (pageWidth > 0) { parts.push(`PAGEWIDTH(${pageWidth})`); }
+    if (pageLength > 0) { parts.push(`PAGELENGTH(${pageLength})`); }
+
+    // 链接器代码列表 (.cod 文件)
+    const codeListing = config.get<boolean>('l251CodeListingEnabled', false);
+    if (codeListing) {
+        parts.push('CODE(.\\out_file\\*.cod)');
+    }
+
+    return parts.join(' ');
 }
 
 /**
