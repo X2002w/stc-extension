@@ -107,7 +107,7 @@ export class StcCompiler {
             }
             // L251: 输出文件路径（相对工作区，与 Keil 格式一致）
             const outputDirRel = path.relative(workspaceRoot, project.outputDir) || '.';
-            const absRelPath = '.\\' + path.join(outputDirRel, project.name + '.abs');
+            const absRelPath = '.\\' + path.join(outputDirRel, project.name);
             const mapRelPath = '.\\' + path.join(outputDirRel, project.name + '.map');
 
             const l251Summary: string[] = [];
@@ -266,8 +266,8 @@ export class StcCompiler {
 
                 // 步骤4: 生成 HEX (OH251.EXE) — 仅在链接成功时执行
                 if (!linkFailed) {
-                    // L251 生成 .abs 文件，OH251 需要精确的文件名
-                    const omfFile = path.join(project.outputDir, project.name + '.abs');
+                    // L251 生成无扩展名的 OMF 文件（与 Keil 一致），OH251 需要精确的文件名
+                    const omfFile = path.join(project.outputDir, project.name);
                     const hexFile = path.join(project.outputDir, project.name + '.hex');
 
                     this.outputChannel.appendLine('[OH251] 生成 HEX...');
@@ -386,7 +386,11 @@ export class StcCompiler {
                 fs.unlinkSync(path.join(outputDir, file));
                 count++;
             }
-            // 也删除无扩展名的编译产物（如 .abs 实际可能是无扩展名的 omf）
+            // L251 生成的无扩展名 OMF 文件（与 Keil 一致，文件名为项目名）
+            if (file === project.name || file === project.name + '.abs') {
+                fs.unlinkSync(path.join(outputDir, file));
+                count++;
+            }
         }
 
         this.outputChannel.clear();
