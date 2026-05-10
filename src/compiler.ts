@@ -180,15 +180,22 @@ export class StcCompiler {
                 const mapPath = path.join(project.outputDir, project.name + '.map');
 
                 // 构建链接控制文件内容
-                // 格式: obj列表 → TO → PRINT(mAP) → DISABLEWARNING → REMOVEUNUSED → CLASSES
+                // 格式: obj列表 → TO → PRINT → CASE → DISABLEWARNING → WARNINGLEVEL → ... → CLASSES
                 const linkLines: string[] = [];
                 linkLines.push(allLinkFiles.map((f) => `"${f}"`).join(',\n'));
                 linkLines.push(`TO "${absPath}"`);
-
-                // 生成 Map 文件
                 linkLines.push(`PRINT("${mapPath}")`);
 
-                // 屏蔽未调用函数/段的警告 (Keil 默认屏蔽 15,16,57)
+                // CASE: 区分大小写链接（与 Keil uVision 行为一致）
+                linkLines.push('CASE');
+
+                // L251 警告等级（从 VS Code 用户设置读取）
+                const l251WarnLevel = vscode.workspace.getConfiguration('stc-extension').get<string>('l251WarningLevel', 'DEFAULT');
+                if (l251WarnLevel !== 'DEFAULT') {
+                    linkLines.push(`WARNINGLEVEL(${l251WarnLevel})`);
+                }
+
+                // 屏蔽未调用函数/段的警告编号（如 57,16）
                 if (project.l251DisableWarnings) {
                     linkLines.push(`DISABLEWARNING (${project.l251DisableWarnings.replace(/,/g, ', ')})`);
                 }
@@ -198,8 +205,9 @@ export class StcCompiler {
                     linkLines.push(project.l251Misc);
                 }
 
-                // 内存布局 CLASSES 指令
-                if (project.l251Classes) {
+                // Use Memory Layout from Target Dialog → CLASSES 指令
+                const useMemoryLayout = vscode.workspace.getConfiguration('stc-extension').get<boolean>('l251UseMemoryLayout', true);
+                if (useMemoryLayout && project.l251Classes) {
                     linkLines.push(`CLASSES (${project.l251Classes})`);
                 }
 

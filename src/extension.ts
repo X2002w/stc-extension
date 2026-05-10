@@ -549,40 +549,40 @@ async function ensureProject(): Promise<
         const parsed = uvprojParser.parse(uvprojPath);
         if (parsed) {
             currentUvprojPath = uvprojPath;
-            // 合并 VS Code 用户设置
-            // 策略：uvproj 工程文件设置为主，VS Code 设置为补充/覆盖
+            // 策略：uvproj 工程设置为主，VS Code 只补充必需的 STC32G 项和用户额外参数
             const c251 = getC251Config();
 
-            // c251Misc: uvproj 做主，追加用户自定义的额外控制参数和缺失的 STC32G 配置
             let finalC251Misc = parsed.c251Misc;
+            // 追加用户自定义的 c251Misc
             const extraMisc = vscode.workspace.getConfiguration('stc-extension').get<string>('c251Misc', '');
             if (extraMisc && !finalC251Misc.toLowerCase().includes(extraMisc.toLowerCase())) {
                 finalC251Misc += ' ' + extraMisc;
             }
-            // 补充 uvproj 中未包含的 rom() 指令
-            if (c251.romSize && !/rom\s*\(/i.test(finalC251Misc)) {
-                finalC251Misc = `rom(${c251.romSize.toLowerCase()}) ` + finalC251Misc;
-            }
-            // 补充 INTR2（STC32G 必须）
+            // 补充 INTR2（STC32G 必须，uvproj 中可能通过设备数据库隐式提供）
             if (!/intr2/i.test(finalC251Misc)) {
                 finalC251Misc = 'intr2 ' + finalC251Misc;
             }
-            // 补充 far=HUGE
-            if (c251.romSize === 'HUGE' && !/far\s*=\s*huge/i.test(finalC251Misc)) {
-                finalC251Misc = 'FAR=HUGE ' + finalC251Misc;
-            }
-            // 补充 modbin（binary 模式）
+            // 只有用户显式切换到 BINARY 模式时才添加 modbin
             if (c251.puMode === 'BINARY' && !/modbin/i.test(finalC251Misc)) {
                 finalC251Misc = 'modbin ' + finalC251Misc;
             }
+            // 注意：rom() / FAR=HUGE 等指令会影响代码生成，不强制添加。
+            // uvproj 工程以 Keil 设备数据库和设备选择为准，
+            // 用户如需覆盖请通过 c251Misc 手动添加。
 
             parsed.c251Misc = finalC251Misc;
 
-            // includePaths 和 defines：合并（uvproj + VS Code 用户设置，去重）
+            // includePaths / defines：合并（uvproj + VS Code，去重）
             parsed.includePaths = [...new Set([...parsed.includePaths, ...c251.includePaths])];
             parsed.defines = [...new Set([...parsed.defines, ...c251.defines])];
 
-            // 如果 VS Code 配置了晶振频率，自动添加 MAIN_Fosc 宏定义
+            // L251 屏蔽警告编号：VS Code 设置覆盖 uvproj（若用户自定义）
+            const vsL251DisableWarnings = vscode.workspace.getConfiguration('stc-extension').get<string>('l251DisableWarnings', '');
+            if (vsL251DisableWarnings) {
+                parsed.l251DisableWarnings = vsL251DisableWarnings;
+            }
+
+            // 晶振频率 → MAIN_Fosc 宏
             if (c251.xtalFrequency > 0) {
                 const freqDefine = `MAIN_Fosc=${c251.xtalFrequency * 1000000}`;
                 if (!parsed.defines.some(d => d.startsWith('MAIN_Fosc='))) {
@@ -610,15 +610,12 @@ async function autoLoadProject(): Promise<boolean> {
         const parsed = uvprojParser.parse(uvprojPath);
         if (parsed) {
             currentUvprojPath = uvprojPath;
-            // 合并 VS Code 用户设置（uvproj 为主，VS Code 为补充）
+            // uvproj 工程设置为主，VS Code 补充必需项
             const c251 = getC251Config();
             let finalC251Misc = parsed.c251Misc;
             const extraMisc = vscode.workspace.getConfiguration('stc-extension').get<string>('c251Misc', '');
             if (extraMisc && !finalC251Misc.toLowerCase().includes(extraMisc.toLowerCase())) {
                 finalC251Misc += ' ' + extraMisc;
-            }
-            if (c251.romSize && !/rom\s*\(/i.test(finalC251Misc)) {
-                finalC251Misc = `rom(${c251.romSize.toLowerCase()}) ` + finalC251Misc;
             }
             if (!/intr2/i.test(finalC251Misc)) {
                 finalC251Misc = 'intr2 ' + finalC251Misc;
@@ -629,6 +626,10 @@ async function autoLoadProject(): Promise<boolean> {
             parsed.c251Misc = finalC251Misc;
             parsed.includePaths = [...new Set([...parsed.includePaths, ...c251.includePaths])];
             parsed.defines = [...new Set([...parsed.defines, ...c251.defines])];
+            const vsL251DisableWarnings2 = vscode.workspace.getConfiguration('stc-extension').get<string>('l251DisableWarnings', '');
+            if (vsL251DisableWarnings2) {
+                parsed.l251DisableWarnings = vsL251DisableWarnings2;
+            }
             if (c251.xtalFrequency > 0) {
                 const freqDefine = `MAIN_Fosc=${c251.xtalFrequency * 1000000}`;
                 if (!parsed.defines.some(d => d.startsWith('MAIN_Fosc='))) {

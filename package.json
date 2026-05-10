@@ -352,6 +352,33 @@
           "type": "boolean",
           "default": false,
           "description": "将 far 指针视为 huge 指针 (Treat far pointer as huge pointer) — far 指针默认已支持 24 位寻址，启用后会增加代码体积，无特殊需求无需开启。"
+        },
+        "stc-extension.l251WarningLevel": {
+          "type": "string",
+          "default": "DEFAULT",
+          "enum": [
+            "DEFAULT",
+            "0",
+            "1",
+            "2"
+          ],
+          "enumDescriptions": [
+            "默认 — 不生成 WARNINGLEVEL 指令",
+            "Warninglevel 0 — 禁用警告 | Disable warnings",
+            "Warninglevel 1 — 警告级别 1",
+            "Warninglevel 2 — 警告级别 2 (显示最多警告)"
+          ],
+          "description": "L251 链接器警告级别 (Linker Warning Level)"
+        },
+        "stc-extension.l251DisableWarnings": {
+          "type": "string",
+          "default": "57,16",
+          "description": "L251 屏蔽的链接器警告编号 (Disable Warning Numbers) — 如 57(UNCALLED FUNCTION), 16(UNCALLED SEGMENT)，多个编号用逗号分隔。"
+        },
+        "stc-extension.l251UseMemoryLayout": {
+          "type": "boolean",
+          "default": true,
+          "description": "使用 Target Dialog 中的内存布局 (Use Memory Layout from Target Dialog) — 启用后根据 uvproj 中配置的片上内存生成 CLASSES 指令。"
         }
       }
     },
