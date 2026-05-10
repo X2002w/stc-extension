@@ -266,19 +266,18 @@ export class StcCompiler {
 
                 // 步骤4: 生成 HEX (OH251.EXE) — 仅在链接成功时执行
                 if (!linkFailed) {
-                    // 使用相对路径（与 Keil 一致），OH251 不能处理含绝对路径的 H386() 指令
+                    // OH251 接收 L251 生成的无扩展名 OMF 目标文件 + 可选的 H386 标志
+                    // H386: 输出 Intel HEX-386 格式（32 位扩展地址），不加则默认 HEX-80
                     const omfFileRel = '.\\' + path.join(outputDirRel, project.name);
-                    const hexFileRel = '.\\' + path.join(outputDirRel, project.name + '.hex');
-
-                    // HEX 格式: HEX-80 → HEXFILE, HEX-386 → H386
                     const hexFormat = project.hexFormat || 'HEX-386';
-                    const hexDirective = hexFormat === 'HEX-80'
-                        ? `HEXFILE(${hexFileRel})`
-                        : `H386(${hexFileRel})`;
+                    const ohArgs = [omfFileRel];
+                    if (hexFormat === 'HEX-386') {
+                        ohArgs.push('H386');
+                    }
                     this.outputChannel.appendLine(`[OH251] 生成 HEX (${hexFormat})...`);
                     const ohResult = await this.execTool(
                         this.toolPaths.get('OH251.EXE')!,
-                        [omfFileRel, hexDirective],
+                        ohArgs,
                         workspaceRoot
                     );
                     allOutput += ohResult.stdout + '\n' + ohResult.stderr + '\n';
