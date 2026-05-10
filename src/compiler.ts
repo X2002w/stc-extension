@@ -83,23 +83,11 @@ export class StcCompiler {
                 return true;
             });
 
-            // 构建共同的命令行参数（每个 incdir/define 作为独立参数，C251 V5.60 要求小写）
-            const includeArgs: string[] = project.includePaths.map((inc) => `incdir(${inc})`);
-            const defineArgs: string[] = project.defines.length > 0
-                ? [`define(${project.defines.join(', ')})`]
-                : [];
-
             // --- 输出所有工具链控制字 ---
             this.outputChannel.appendLine('=== 编译控制字 ===');
-            // C251
+            // C251: INCDIR/DEFINE 已合入 c251Misc，一行显示（与 Keil 格式一致）
             const c251Ctrl = (project.c251Misc || 'xsmall').trim();
             this.outputChannel.appendLine(`[C251] ${c251Ctrl}`);
-            if (includeArgs.length > 0) {
-                this.outputChannel.appendLine(`       ${includeArgs.join(' ')}`);
-            }
-            if (defineArgs.length > 0) {
-                this.outputChannel.appendLine(`       ${defineArgs.join(' ')}`);
-            }
             // A251
             const a251Ctrl = (project.a251Misc || '').trim();
             if (a251Ctrl) {
@@ -135,8 +123,6 @@ export class StcCompiler {
                 const args = [
                     cFile,
                     ...miscArgs,
-                    ...includeArgs,
-                    ...defineArgs,
                     `object(${objFile})`,
                 ];
 

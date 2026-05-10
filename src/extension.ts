@@ -634,6 +634,7 @@ async function autoLoadProject(): Promise<boolean> {
                         : path.join(rootPath, 'output'),
                     c251Misc: jsonMisc || c251.controlString,
                     a251Misc: config.a251Misc || getA251Config(),
+                    a251IncludePaths: [],
                     l251Misc: getL251Config(),
                     l251DisableWarnings: vscode.workspace.getConfiguration('stc-extension').get<string>('l251DisableWarnings', '57,16'),
                     l251Classes: '',
@@ -932,12 +933,32 @@ function applyVsCodeOverride(parsed: import('./uvprojParser').UvprojProject): vo
     }
     parsed.c251Misc = finalC251Misc;
 
-    // A251 合并：补充 EP、DEBUG、SET、MODSRC、用户自定义 extraMisc
+    // A251 合并：补充 EP、DEBUG、SET、MODSRC、INCDIR、PRINT、用户自定义 extraMisc
     let finalA251Misc = parsed.a251Misc || '';
     if (!/ep\b/i.test(finalA251Misc)) { finalA251Misc = 'EP ' + finalA251Misc; }
     if (!/\bdebug\b/i.test(finalA251Misc)) { finalA251Misc += ' DEBUG'; }
     if (!/set\s*\(/i.test(finalA251Misc)) { finalA251Misc += ` SET(${c251.memoryModel || 'LARGE'})`; }
     if (!/\bmodsrc\b/i.test(finalA251Misc)) { finalA251Misc += ' MODSRC'; }
+    // A251 INCDIR：合并 uvproj A251 路径 + VS Code C251 路径（A251 也需访问头文件）
+    const allA251Includes = [...new Set([...(parsed.a251IncludePaths || []), ...c251.includePaths])];
+    if (!/incdir\s*\(/i.test(finalA251Misc) && allA251Includes.length > 0) {
+        const workspaceRoot2 = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        if (workspaceRoot2) {
+            const relIncludes = allA251Includes
+                .map(p => path.relative(workspaceRoot2, p))
+                .join(';');
+            finalA251Misc += ` INCDIR(${relIncludes})`;
+        }
+    }
+    // A251 PRINT/Listing：从 VS Code 配置添加
+    if (!/print\s*\(/i.test(finalA251Misc)) {
+        const listingEnabled = vscode.workspace.getConfiguration('stc-extension').get<boolean>('a251ListingEnabled', true);
+        if (listingEnabled) {
+            const listingOpts = vscode.workspace.getConfiguration('stc-extension').get<string>('a251ListingOptions', 'COND SYMBOLS');
+            if (listingOpts) { finalA251Misc += ` ${listingOpts.toUpperCase()}`; }
+            finalA251Misc += ' PRINT(.\\out_file\\*.lst)';
+        }
+    }
     const extraA251Misc = vscode.workspace.getConfiguration('stc-extension').get<string>('a251Misc', '');
     if (extraA251Misc && !finalA251Misc.toLowerCase().includes(extraA251Misc.toLowerCase())) {
         finalA251Misc += ' ' + extraA251Misc;
@@ -947,6 +968,18 @@ function applyVsCodeOverride(parsed: import('./uvprojParser').UvprojProject): vo
     // includePaths / defines 合并（去重）
     parsed.includePaths = [...new Set([...parsed.includePaths, ...c251.includePaths])];
     parsed.defines = [...new Set([...parsed.defines, ...c251.defines])];
+
+    // 将 INCDIR 和 DEFINE 合入 C251 控制字（与 Keil 格式一致，使用相对路径）
+    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (workspaceRoot && parsed.includePaths.length > 0) {
+        const relIncludes = parsed.includePaths
+            .map(p => path.relative(workspaceRoot, p))
+            .join(';');
+        parsed.c251Misc += ` INCDIR(${relIncludes})`;
+    }
+    if (parsed.defines.length > 0) {
+        parsed.c251Misc += ` DEFINE(${parsed.defines.join(', ')})`;
+    }
 
     // L251 屏蔽警告编号：VS Code 设置覆盖 uvproj
     const vsL251DisableWarnings = vscode.workspace.getConfiguration('stc-extension').get<string>('l251DisableWarnings', '');

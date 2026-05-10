@@ -19,6 +19,7 @@ export interface UvprojProject {
     outputDir: string;
     c251Misc: string;
     a251Misc: string;
+    a251IncludePaths: string[];  // A251 汇编器 include 路径（从 Ax51 > VariousControls > IncludePath 提取）
     l251Misc: string;
     l251DisableWarnings: string;  // 屏蔽的 L251 警告编号，如 "15,16,57"
     l251Classes: string;          // CLASSES 内存布局指令，如 "EDATA (0x0-0xFFF), HDATA (0x0-0xFFF)"
@@ -140,6 +141,7 @@ export class UvprojParser {
             let l251Classes = '';
             let defines: string[] = [];
             let includePaths: string[] = [];
+            let a251IncludePaths: string[] = [];
 
             // 独立设置字段（从 uvproj 提取，供 VS Code 配置覆盖）
             let uvMemoryModel = '';
@@ -209,6 +211,9 @@ export class UvprojParser {
                 if (ax51Node) {
                     const a251VC = this.findNode(ax51Node, 'VariousControls');
                     a251Misc = this.getText(a251VC, 'MiscControls') || '';
+                    // 提取 A251 独立的 IncludePath
+                    const a251IncludePath = this.getText(a251VC, 'IncludePath') || '';
+                    a251IncludePaths = this.parseSemicolonList(a251IncludePath, projectDir);
                 }
 
                 // L251 链接器参数
@@ -380,6 +385,7 @@ export class UvprojParser {
                 outputDir,
                 c251Misc,
                 a251Misc,
+                a251IncludePaths,
                 l251Misc,
                 l251DisableWarnings,
                 l251Classes,
