@@ -12,6 +12,7 @@ export interface UvprojProject {
     name: string;
     device: string;
     toolchainPath: string;
+    projectDir: string;         // 工程根目录（uvproj 文件所在目录或工作区根目录），工具链从此目录执行
     groups: FileGroup[];
     libraries: string[];        // .lib / .obj 文件，直接传给链接器，不需要编译
     defines: string[];
@@ -378,6 +379,7 @@ export class UvprojParser {
                 name,
                 device,
                 toolchainPath: this.guessToolchainPath(),
+                projectDir,
                 groups: fileGroups,
                 libraries: libraryFiles,
                 defines,

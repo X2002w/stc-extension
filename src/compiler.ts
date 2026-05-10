@@ -7,7 +7,7 @@ import { UvprojProject } from './uvprojParser';
 
 /**
  * 编译流程编排器
- * 流程: C251 (C编译) → A251 (汇编) → L251 (链接) → OH251 (生成HEX)
+ * 流程: A251 (汇编) → C251 (C编译) → L251 (链接) → OH251 (生成HEX)
  */
 export class StcCompiler {
     private outputChannel: vscode.OutputChannel;
@@ -40,8 +40,9 @@ export class StcCompiler {
             return false;
         }
 
-        const workspaceRoot = this.getWorkspaceRoot();
-        if (!workspaceRoot) {
+        // 工具链从工程目录（uvproj 所在目录）执行，与 Keil uVision 行为一致
+        const projectDir = project.projectDir;
+        if (!projectDir) {
             return false;
         }
 
@@ -58,6 +59,8 @@ export class StcCompiler {
             if (!fs.existsSync(project.outputDir)) {
                 fs.mkdirSync(project.outputDir, { recursive: true });
             }
+            this.outputChannel.appendLine(`[build] outputDir: ${project.outputDir} (exists: ${fs.existsSync(project.outputDir)})`);
+            this.outputChannel.appendLine(`[build] projectDir: ${projectDir}`);
 
             // 收集所有源文件（从分组中扁平化）
             const cFiles: string[] = [];
@@ -93,8 +96,8 @@ export class StcCompiler {
             if (a251Ctrl) {
                 this.outputChannel.appendLine(`[A251] ${a251Ctrl}`);
             }
-            // L251: 输出文件路径（相对工作区，与 Keil 格式一致）
-            const outputDirRel = path.relative(workspaceRoot, project.outputDir) || '.';
+            // L251: 输出文件路径（相对于工程目录，与 Keil 格式一致）
+            const outputDirRel = path.relative(projectDir, project.outputDir) || '.';
             const absRelPath = '.\\' + path.join(outputDirRel, project.name);
             const mapRelPath = '.\\' + path.join(outputDirRel, project.name + '.map');
 
@@ -110,8 +113,51 @@ export class StcCompiler {
             }
             this.outputChannel.appendLine('');
 
-            // 步骤1: 编译 C 源文件 (C251.EXE)
+            // 步骤1: 汇编 .a51/.asm 文件 (A251.EXE) — Keil 先汇编后编译
             const objFiles: string[] = [];
+            for (const asmFile of asmFiles) {
+                const asmBaseName = path.basename(asmFile, path.extname(asmFile));
+                const objFile = path.join(
+                    project.outputDir,
+                    asmBaseName + '.obj'
+                );
+                objFiles.push(objFile);
+
+                const miscArgs = project.a251Misc || '';
+                const lstFile = path.join(project.outputDir, asmBaseName + '.lst');
+                const args = [
+                    asmFile,
+                    ...miscArgs.split(/\s+/),
+                    `PRINT(${lstFile})`,
+                    `object(${objFile})`,
+                ].filter((a) => a.length > 0);
+
+                this.outputChannel.appendLine(
+                    `[A251] 汇编 ${path.basename(asmFile)}...`
+                );
+                this.outputChannel.appendLine(`[A251] cwd: ${projectDir} | out_file exists: ${fs.existsSync(path.join(projectDir, 'out_file'))}`);
+                const result = await this.execTool(
+                    this.toolPaths.get('A251.EXE')!,
+                    args,
+                    projectDir
+                );
+                allOutput += result.stdout + '\n' + result.stderr + '\n';
+                this.outputChannel.append(result.stdout);
+                if (result.stderr) {
+                    this.outputChannel.append(result.stderr);
+                }
+                if (result.exitCode >= 2) {
+                    this.outputChannel.appendLine(
+                        `[A251] 汇编失败 (exit code: ${result.exitCode})`
+                    );
+                } else if (result.exitCode === 1) {
+                    this.outputChannel.appendLine(
+                        `[A251] 汇编成功（有警告）`
+                    );
+                }
+            }
+
+            // 步骤2: 编译 C 源文件 (C251.EXE)
             for (const cFile of cFiles) {
                 const objFile = path.join(
                     project.outputDir,
@@ -132,7 +178,7 @@ export class StcCompiler {
                 const result = await this.execTool(
                     this.toolPaths.get('C251.EXE')!,
                     args,
-                    workspaceRoot
+                    projectDir
                 );
                 allOutput += result.stdout + '\n' + result.stderr + '\n';
                 this.outputChannel.append(result.stdout);
@@ -150,45 +196,6 @@ export class StcCompiler {
                 }
             }
 
-            // 步骤2: 汇编 .a51/.asm 文件 (A251.EXE)
-            for (const asmFile of asmFiles) {
-                const objFile = path.join(
-                    project.outputDir,
-                    path.basename(asmFile, path.extname(asmFile)) + '.obj'
-                );
-                objFiles.push(objFile);
-
-                const miscArgs = project.a251Misc || '';
-                const args = [
-                    asmFile,
-                    ...miscArgs.split(/\s+/),
-                    `object(${objFile})`,
-                ].filter((a) => a.length > 0);
-
-                this.outputChannel.appendLine(
-                    `[A251] 汇编 ${path.basename(asmFile)}...`
-                );
-                const result = await this.execTool(
-                    this.toolPaths.get('A251.EXE')!,
-                    args,
-                    workspaceRoot
-                );
-                allOutput += result.stdout + '\n' + result.stderr + '\n';
-                this.outputChannel.append(result.stdout);
-                if (result.stderr) {
-                    this.outputChannel.append(result.stderr);
-                }
-                if (result.exitCode >= 2) {
-                    this.outputChannel.appendLine(
-                        `[A251] 汇编失败 (exit code: ${result.exitCode})`
-                    );
-                } else if (result.exitCode === 1) {
-                    this.outputChannel.appendLine(
-                        `[A251] 汇编成功（有警告）`
-                    );
-                }
-            }
-
             // 步骤3: 链接 (L251.EXE)
             let linkFailed = false;
             if (objFiles.length > 0) {
@@ -199,7 +206,7 @@ export class StcCompiler {
                 // 构建链接控制文件内容（使用相对路径，与 Keil uVision 格式一致）
                 // 格式: obj列表 → TO → PRINT → CASE → DISABLEWARNING → WARNINGLEVEL → ... → CLASSES
                 const linkLines: string[] = [];
-                linkLines.push(allLinkFiles.map((f) => `".\\${path.relative(workspaceRoot, f)}"`).join(',\n'));
+                linkLines.push(allLinkFiles.map((f) => `".\\${path.relative(projectDir, f)}"`).join(',\n'));
                 linkLines.push(`TO "${absRelPath}"`);
                 linkLines.push(`PRINT("${mapRelPath}")`);
 
@@ -235,7 +242,7 @@ export class StcCompiler {
                 const result = await this.execTool(
                     this.toolPaths.get('L251.EXE')!,
                     ['@' + linkFile],
-                    workspaceRoot
+                    projectDir
                 );
                 allOutput += result.stdout + '\n' + result.stderr + '\n';
                 this.outputChannel.append(result.stdout);
@@ -264,7 +271,7 @@ export class StcCompiler {
                     const ohResult = await this.execTool(
                         this.toolPaths.get('OH251.EXE')!,
                         ohArgs,
-                        workspaceRoot
+                        projectDir
                     );
                     allOutput += ohResult.stdout + '\n' + ohResult.stderr + '\n';
                     this.outputChannel.append(ohResult.stdout);
@@ -275,7 +282,7 @@ export class StcCompiler {
             }
 
             // 解析输出生成诊断
-            this.diagnosticParser.parse(allOutput, workspaceRoot);
+            this.diagnosticParser.parse(allOutput, projectDir);
 
             const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
             const errorCount = this.countErrors(allOutput);
@@ -301,7 +308,7 @@ export class StcCompiler {
                     this.outputChannel.appendLine(hexStatus);
                 }
                 this.outputChannel.appendLine(
-                    `\n".\\${path.relative(workspaceRoot, path.join(project.outputDir, project.name))}" - ${errorCount} Error(s), ${warningCount} Warning(s).`
+                    `\n".\\${path.relative(projectDir, path.join(project.outputDir, project.name))}" - ${errorCount} Error(s), ${warningCount} Warning(s).`
                 );
                 this.outputChannel.appendLine(`Build Time Elapsed:  ${elapsed}s`);
 
@@ -516,7 +523,7 @@ export class StcCompiler {
 
             const proc = spawn(exePath, quotedArgs, {
                 cwd,
-                shell: true,
+                shell: false,
                 stdio: 'pipe',
             } as SpawnOptions);
 

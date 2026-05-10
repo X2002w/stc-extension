@@ -619,6 +619,7 @@ async function autoLoadProject(): Promise<boolean> {
                 const project = {
                     name: config.name || 'STCProject',
                     device: config.device || 'STC32G12K128',
+                    projectDir: rootPath,
                     toolchainPath:
                         config.toolchainPath ||
                         vscode.workspace
@@ -809,73 +810,68 @@ function getC251Config(): {
  */
 function getA251Config(): string {
     const config = vscode.workspace.getConfiguration('stc-extension');
-    const parts: string[] = [];
+    const mainParts: string[] = [];
+    const otherParts: string[] = [];
 
-    // 1. 宏处理器: STANDARD/MPL/OFF（OFF 时不添加）
-    const macroProc = config.get<string>('a251MacroProcessor', 'STANDARD');
-    if (macroProc === 'STANDARD') {
-        // Standard is default, no flag needed
-    } else if (macroProc === 'MPL') {
-        parts.push('MPL');
-    }
-    // OFF: NOMACRO or just skip
+    // === 按 Keil 顺序: MODSRC → SET → DEBUG → PRINT → EP ===
 
-    // 2. 区分大小写符号（默认不区分，即 CASEINSENSITIVE）
-    const caseSensitive = config.get<boolean>('a251CaseSensitive', false);
-    if (caseSensitive) {
-        parts.push('CASE');
+    // 1. MODSRC: 修改源列表
+    const modSrc = config.get<boolean>('a251ModSrc', true);
+    if (modSrc) {
+        mainParts.push('MODSRC');
     }
 
-    // 3. 扩展处理 EP (80251 指令集必须)
-    const epEnabled = config.get<boolean>('a251ExtendedProcessing', true);
-    if (epEnabled) {
-        parts.push('EP');
-    }
-
-    // 4. 调试信息
-    const debugInfo = config.get<boolean>('a251DebugInfo', true);
-    if (debugInfo) {
-        parts.push('DEBUG');
-    }
-
-    // 5. SET 符号：根据内存模型定义 LARGE/SMALL/COMPACT 等条件汇编符号
+    // 2. SET 符号：根据内存模型定义条件汇编符号
     const memoryModel = config.get<string>('c251MemoryModel', 'LARGE');
     const setSymbolMap: Record<string, string> = {
         'SMALL': 'SMALL', 'XSMALL': 'XSMALL', 'COMPACT': 'COMPACT', 'LARGE': 'LARGE',
     };
     const setSymbol = setSymbolMap[memoryModel];
     if (setSymbol) {
-        parts.push(`SET(${setSymbol})`);
+        mainParts.push(`SET(${setSymbol})`);
     }
 
-    // 6. 修改源列表 MODSRC
-    const modSrc = config.get<boolean>('a251ModSrc', true);
-    if (modSrc) {
-        parts.push('MODSRC');
+    // 3. DEBUG: 调试信息
+    const debugInfo = config.get<boolean>('a251DebugInfo', true);
+    if (debugInfo) {
+        mainParts.push('DEBUG');
     }
 
-    // 7. 页面格式
+    // 4. PRINT 在 compiler.ts 中按文件动态生成（避免 * 通配符问题）
+
+    // 5. EP: 扩展处理 (80251 指令集必须)
+    const epEnabled = config.get<boolean>('a251ExtendedProcessing', true);
+    if (epEnabled) {
+        mainParts.push('EP');
+    }
+
+    // === 其他标志（不在 Keil 摘要中显示，但仍然传给 A251） ===
+
+    // 宏处理器: MPL
+    const macroProc = config.get<string>('a251MacroProcessor', 'STANDARD');
+    if (macroProc === 'MPL') {
+        otherParts.push('MPL');
+    }
+
+    // 区分大小写符号
+    const caseSensitive = config.get<boolean>('a251CaseSensitive', false);
+    if (caseSensitive) {
+        otherParts.push('CASE');
+    }
+
+    // 页面格式
     const pageWidth = config.get<number>('listingPageWidth', 120);
     const pageLength = config.get<number>('listingPageLength', 65);
-    if (pageWidth > 0) { parts.push(`PAGEWIDTH(${pageWidth})`); }
-    if (pageLength > 0) { parts.push(`PAGELENGTH(${pageLength})`); }
+    if (pageWidth > 0) { otherParts.push(`PAGEWIDTH(${pageWidth})`); }
+    if (pageLength > 0) { otherParts.push(`PAGELENGTH(${pageLength})`); }
 
-    // 8. 汇编器列表
-    const listingEnabled = config.get<boolean>('a251ListingEnabled', true);
-    if (listingEnabled) {
-        const listingOpts = config.get<string>('a251ListingOptions', 'COND SYMBOLS');
-        if (listingOpts) { parts.push(listingOpts.toUpperCase()); }
-        parts.push('PRINT(.\\out_file\\*.lst)');
-    }
-
-    // 9. 用户自定义额外控制参数
+    // 用户自定义额外控制参数
     const extraMisc = config.get<string>('a251Misc', '');
     if (extraMisc) {
-        parts.push(extraMisc);
+        otherParts.push(extraMisc);
     }
 
-    // 去重
-    return [...new Set(parts)].join(' ');
+    return [...mainParts, ...otherParts].join(' ');
 }
 
 /**
@@ -933,47 +929,89 @@ function applyVsCodeOverride(parsed: import('./uvprojParser').UvprojProject): vo
     }
     parsed.c251Misc = finalC251Misc;
 
-    // A251 合并：补充 EP、DEBUG、SET、MODSRC、INCDIR、PRINT、用户自定义 extraMisc
-    let finalA251Misc = parsed.a251Misc || '';
-    if (!/ep\b/i.test(finalA251Misc)) { finalA251Misc = 'EP ' + finalA251Misc; }
-    if (!/\bdebug\b/i.test(finalA251Misc)) { finalA251Misc += ' DEBUG'; }
-    if (!/set\s*\(/i.test(finalA251Misc)) { finalA251Misc += ` SET(${c251.memoryModel || 'LARGE'})`; }
-    if (!/\bmodsrc\b/i.test(finalA251Misc)) { finalA251Misc += ' MODSRC'; }
-    // A251 INCDIR：合并 uvproj A251 路径 + VS Code C251 路径（A251 也需访问头文件）
+    // A251 合并：按 Keil 顺序重建控制字
+    // Keil 格式: MODSRC INCDIR(path) SET (LARGE) DEBUG PRINT(path) EP [其他]
+    const rawA251 = parsed.a251Misc || '';
+
+    // 从原始控制字中剥离已知标志，保留未知部分
+    let rawRemainder = rawA251;
+    rawRemainder = rawRemainder.replace(/\bEP\b/gi, '');
+    rawRemainder = rawRemainder.replace(/\bDEBUG\b/gi, '');
+    rawRemainder = rawRemainder.replace(/\bSET\s*\([^)]*\)/gi, '');
+    rawRemainder = rawRemainder.replace(/\bMODSRC\b/gi, '');
+    rawRemainder = rawRemainder.replace(/\bINCDIR\s*\([^)]*\)/gi, '');
+    rawRemainder = rawRemainder.replace(/\bPRINT\s*\([^)]*\)/gi, '');
+    rawRemainder = rawRemainder.replace(/\bCOND\b/gi, '');
+    rawRemainder = rawRemainder.replace(/\bSYMBOLS\b/gi, '');
+    rawRemainder = rawRemainder.replace(/\bPAGEWIDTH\s*\([^)]*\)/gi, '');
+    rawRemainder = rawRemainder.replace(/\bPAGELENGTH\s*\([^)]*\)/gi, '');
+    rawRemainder = rawRemainder.replace(/\bXREF\b/gi, '');
+    rawRemainder = rawRemainder.replace(/\bNOMACRO\b/gi, '');
+    rawRemainder = rawRemainder.replace(/\bMPL\b/gi, '');
+    rawRemainder = rawRemainder.replace(/\bCASE\b/gi, '');
+    rawRemainder = rawRemainder.replace(/\bOBJECT\s*\([^)]*\)/gi, '');
+    rawRemainder = rawRemainder.replace(/\s+/g, ' ').trim();
+
+    // 从 VS Code 读取各标志设置
+    const a251ModSrc = vscode.workspace.getConfiguration('stc-extension').get<boolean>('a251ModSrc', true);
+    const a251EP = vscode.workspace.getConfiguration('stc-extension').get<boolean>('a251ExtendedProcessing', true);
+    const a251Debug = vscode.workspace.getConfiguration('stc-extension').get<boolean>('a251DebugInfo', true);
+    const a251ListingEnabled = vscode.workspace.getConfiguration('stc-extension').get<boolean>('a251ListingEnabled', true);
+
+    // 路径计算基准目录（uvproj 所在目录，与 Keil 行为一致）
+    const projectBaseDir = parsed.projectDir || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '.';
+
+    // 按 Keil 顺序重建：MODSRC → INCDIR → SET → DEBUG → PRINT → EP → [rawRemainder] → [extraMisc]
+    const a251Parts: string[] = [];
+
+    if (a251ModSrc) {
+        a251Parts.push('MODSRC');
+    }
+
+    // INCDIR（合并 uvproj A251 路径 + VS Code C251 路径）
     const allA251Includes = [...new Set([...(parsed.a251IncludePaths || []), ...c251.includePaths])];
-    if (!/incdir\s*\(/i.test(finalA251Misc) && allA251Includes.length > 0) {
-        const workspaceRoot2 = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-        if (workspaceRoot2) {
-            const relIncludes = allA251Includes
-                .map(p => path.relative(workspaceRoot2, p))
-                .join(';');
-            finalA251Misc += ` INCDIR(${relIncludes})`;
-        }
+    if (allA251Includes.length > 0) {
+        const relIncludes = allA251Includes
+            .map(p => path.relative(projectBaseDir, p))
+            .join(';');
+        a251Parts.push(`INCDIR(${relIncludes})`);
     }
-    // A251 PRINT/Listing：从 VS Code 配置添加
-    if (!/print\s*\(/i.test(finalA251Misc)) {
-        const listingEnabled = vscode.workspace.getConfiguration('stc-extension').get<boolean>('a251ListingEnabled', true);
-        if (listingEnabled) {
-            const listingOpts = vscode.workspace.getConfiguration('stc-extension').get<string>('a251ListingOptions', 'COND SYMBOLS');
-            if (listingOpts) { finalA251Misc += ` ${listingOpts.toUpperCase()}`; }
-            finalA251Misc += ' PRINT(.\\out_file\\*.lst)';
-        }
+
+    // SET (MODEL) — 必须写作 SET(LARGE) 无空格，因为命令行参数以空格分隔
+    const a251SetModel = (c251.memoryModel || 'LARGE').toUpperCase();
+    a251Parts.push(`SET(${a251SetModel})`);
+
+    if (a251Debug) {
+        a251Parts.push('DEBUG');
     }
+
+    // PRINT 在 compiler.ts 中按文件动态生成（避免 * 通配符在 Windows 上的问题）
+
+    if (a251EP) {
+        a251Parts.push('EP');
+    }
+
+    // 原始控制字中未被识别的部分
+    if (rawRemainder) {
+        a251Parts.push(rawRemainder);
+    }
+
+    // 用户自定义额外 A251 控制字
     const extraA251Misc = vscode.workspace.getConfiguration('stc-extension').get<string>('a251Misc', '');
-    if (extraA251Misc && !finalA251Misc.toLowerCase().includes(extraA251Misc.toLowerCase())) {
-        finalA251Misc += ' ' + extraA251Misc;
+    if (extraA251Misc && !a251Parts.some(p => p.toLowerCase() === extraA251Misc.toLowerCase())) {
+        a251Parts.push(extraA251Misc);
     }
-    parsed.a251Misc = finalA251Misc;
+
+    parsed.a251Misc = a251Parts.join(' ');
 
     // includePaths / defines 合并（去重）
     parsed.includePaths = [...new Set([...parsed.includePaths, ...c251.includePaths])];
     parsed.defines = [...new Set([...parsed.defines, ...c251.defines])];
 
-    // 将 INCDIR 和 DEFINE 合入 C251 控制字（与 Keil 格式一致，使用相对路径）
-    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    if (workspaceRoot && parsed.includePaths.length > 0) {
+    // 将 INCDIR 和 DEFINE 合入 C251 控制字（与 Keil 格式一致，相对于工程目录）
+    if (parsed.includePaths.length > 0) {
         const relIncludes = parsed.includePaths
-            .map(p => path.relative(workspaceRoot, p))
+            .map(p => path.relative(projectBaseDir, p))
             .join(';');
         parsed.c251Misc += ` INCDIR(${relIncludes})`;
     }
