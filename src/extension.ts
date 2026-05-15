@@ -695,6 +695,7 @@ function getC251Config(): {
     const intFrameSize = config.get<number>('c251InterruptFrameSize', 4);
     const useOnChipRom = config.get<boolean>('c251UseOnChipRom', true);
     const farAsHuge = config.get<boolean>('c251FarAsHugePointer', false);
+    const unsignedChar = config.get<boolean>('c251UnsignedChar', false);
 
     // --- 解析 includePaths ---
     const rawPaths = config.get<string[]>('c251IncludePaths', []);
@@ -760,6 +761,11 @@ function getC251Config(): {
     // 8. far=HUGE 指针
     if (farAsHuge) {
         controlParts.push('FAR=HUGE');
+    }
+
+    // 8.5. plain char 视为 unsigned char
+    if (unsignedChar) {
+        controlParts.push('UNSIGNED_CHAR');
     }
 
     controlParts.push('BROWSE');

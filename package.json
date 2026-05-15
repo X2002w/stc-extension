@@ -353,6 +353,11 @@
           "default": false,
           "description": "将 far 指针视为 huge 指针 (Treat far pointer as huge pointer) — far 指针默认已支持 24 位寻址，启用后会增加代码体积，无特殊需求无需开启。"
         },
+        "stc-extension.c251UnsignedChar": {
+          "type": "boolean",
+          "default": false,
+          "description": "将 plain char 视为 unsigned char (Treat plain char as 'unsigned char') — 启用后 C251 控制字添加 UNSIGNED_CHAR。"
+        },
         "stc-extension.l251WarningLevel": {
           "type": "string",
           "default": "DEFAULT",
