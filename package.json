@@ -177,323 +177,348 @@
         }
       ]
     },
-    "configuration": {
-      "title": "STC Extension",
-      "properties": {
-        "stc-extension.toolchainPath": {
-          "type": "string",
-          "default": "F:\\MPU\\C251\\",
-          "description": "Keil C251 工具链路径（C251.EXE, A251.EXE, L251.EXE, OH251.EXE 所在目录）"
-        },
-        "stc-extension.c251OptimizeLevel": {
-          "type": "string",
-          "default": "0",
-          "enum": [
-            "DEFAULT",
-            "0",
-            "1",
-            "2",
-            "3",
-            "4",
-            "5",
-            "6",
-            "7",
-            "8",
-            "9"
-          ],
-          "enumDescriptions": [
-            "默认 — 使用编译器默认优化级别",
-            "Level 0: 常量折叠 | Constant folding",
-            "Level 1: + 死代码消除 | Dead code elimination",
-            "Level 2: + 访问优化 | Access optimization",
-            "Level 3: + 寄存器变量优化 | Register variables",
-            "Level 4: + 公共子表达式消除 | Common subexpression elimination",
-            "Level 5: + 局部死变量消除 | Dead local variable elimination",
-            "Level 6: + 常量传播 | Constant propagation",
-            "Level 7: + 公共尾代码合并 | Common tail merging",
-            "Level 8: + 公共块子程序打包 | Common block subroutine packing",
-            "Level 9: + 代码重排以最大化公共块 | Rearrange Code to maximize Common Blocks"
-          ],
-          "description": "C251 代码优化级别"
-        },
-        "stc-extension.c251OptimizeEmphasis": {
-          "type": "string",
-          "default": "SPEED",
-          "enum": [
-            "SPEED",
-            "SIZE"
-          ],
-          "enumDescriptions": [
-            "优先优化执行速度 | Favor execution speed",
-            "优先优化代码体积 | Favor code size"
-          ],
-          "description": "C251 优化侧重"
-        },
-        "stc-extension.c251AliasChecking": {
-          "type": "boolean",
-          "default": true,
-          "description": "指针访问的别名检查 | Alias checking on pointer accesses — 关闭则生成 NOALIAS"
-        },
-        "stc-extension.c251MemoryModel": {
-          "type": "string",
-          "default": "LARGE",
-          "enum": [
-            "SMALL",
-            "XSMALL",
-            "COMPACT",
-            "LARGE"
-          ],
-          "enumDescriptions": [
-            "SMALL — 变量默认在 data 区，指针 2 字节",
-            "XSMALL — 变量默认在 data 区，指针 4 字节",
-            "COMPACT — 变量默认在 pdata 区，指针 2 字节",
-            "LARGE — 变量默认在 xdata 区，指针 4 字节 (推荐 STC32G)"
-          ],
-          "description": "C251 内存模型 (Memory Model) — STC32G 推荐 LARGE 模式，变量默认分配到 xdata 区，指针为 4 字节（24 位地址），适配其大容量 RAM。"
-        },
-        "stc-extension.c251WarningLevel": {
-          "type": "string",
-          "default": "3",
-          "enum": [
-            "DEFAULT",
-            "0",
-            "1",
-            "2",
-            "3"
-          ],
-          "enumDescriptions": [
-            "默认 — 不生成 WARNINGLEVEL 指令",
-            "Warninglevel 0 — 禁用警告 | Disable warnings",
-            "Warninglevel 1 — 警告级别 1",
-            "Warninglevel 2 — 警告级别 2",
-            "Warninglevel 3 — 警告级别 3"
-          ],
-          "description": "C251 警告级别"
-        },
-        "stc-extension.c251IncludePaths": {
-          "type": "array",
-          "items": {
-            "type": "string"
+    "configuration": [
+      {
+        "id": "stc-extension",
+        "title": "Target",
+        "order": 10,
+        "properties": {
+          "stc-extension.toolchainPath": {
+            "type": "string",
+            "default": "F:\\MPU\\C251\\",
+            "description": "Keil C251 工具链路径（C251.EXE, A251.EXE, L251.EXE, OH251.EXE 所在目录）"
           },
-          "default": [],
-          "markdownDescription": "C251 头文件包含路径 (相当于 Keil `INCDIR(...)`)\n\n支持相对路径（相对于工作区根目录）"
-        },
-        "stc-extension.c251Defines": {
-          "type": "array",
-          "items": {
-            "type": "string"
+          "stc-extension.hexFormat": {
+            "type": "string",
+            "default": "HEX-386",
+            "enum": [
+              "HEX-80",
+              "HEX-386"
+            ],
+            "enumDescriptions": [
+              "Intel HEX-80 — 标准 8/16 位地址格式",
+              "Intel HEX-386 — 32 位扩展地址格式，STC32G (80251 内核) 推荐"
+            ],
+            "description": "OH251 生成的 Intel HEX 文件格式。STC32G 使用 80251 扩展指令集，推荐使用 HEX-386 以支持 32 位地址空间。"
           },
-          "default": [
-            "STC32G12K128"
-          ],
-          "markdownDescription": "C251 预定义宏 (相当于 Keil `DEFINE(...)`)"
-        },
-        "stc-extension.c251Misc": {
-          "type": "string",
-          "default": "",
-          "markdownDescription": "C251 额外编译器控制参数（附加到控制字符串末尾）\n\n如 `INTR2 DEBUG PRINT(.\\Out_File\\*.lst)`"
-        },
-        "stc-extension.c251PuMode": {
-          "type": "string",
-          "default": "SOURCE",
-          "enum": [
-            "SOURCE",
-            "BINARY"
-          ],
-          "enumDescriptions": [
-            "Source (251 native) — STC32G 推荐模式，生成 C251 原生指令集代码，支持 24 位地址和扩展特性",
-            "Binary (MODBIN) — 二进制兼容模式，兼容传统 8051 指令集，功能受限"
-          ],
-          "description": "PU 模式 | C251 指令模式 — STC32G 必须使用 Source 模式，若选 Binary 模式会导致功能受限。"
-        },
-        "stc-extension.c251XtalFrequency": {
-          "type": "number",
-          "default": 35,
-          "description": "系统时钟频率 (MHz) — 参考值，不自动注入宏定义。请在代码中使用 #define MAIN_Fosc 自行定义。此参数用于文档记录，建议修改为实际使用的频率（如 24.0 或 30.0 MHz）。"
-        },
-        "stc-extension.c251CodeRomSize": {
-          "type": "string",
-          "default": "LARGE",
-          "enum": [
-            "SMALL",
-            "COMPACT",
-            "MEDIUM",
-            "LARGE",
-            "HUGE"
-          ],
-          "enumDescriptions": [
-            "SMALL — 最大 2KB 程序空间",
-            "COMPACT — 最大 64KB 程序空间",
-            "MEDIUM — 任意大小，使用 AJMP/ACALL 指令",
-            "LARGE — 任意大小，使用 LJMP/LCALL 指令 (推荐 STC32G 前 64KB Flash)",
-            "HUGE — 任意大小，使用 EJMP/ECALL 指令 (需配合 Code Banking 使用超过 64KB 的代码空间)"
-          ],
-          "description": "Code Rom Size | 代码 ROM 大小模式 — 适配 STC32G128KB Flash 的前 64KB 空间，如需使用超过 64KB 的代码空间，可配合 Code Banking 选择 HUGE。"
-        },
-        "stc-extension.c251InterruptFrameSize": {
-          "type": "integer",
-          "default": 4,
-          "enum": [
-            0,
-            4
-          ],
-          "enumDescriptions": [
-            "默认中断帧 — 不使用 INTR2",
-            "4 字节中断帧 (INTR2) — C251 架构中断函数默认需要 4 字节的栈帧，是 STC32G 的强制配置"
-          ],
-          "description": "4 Byte Interrupt Frame Size | 中断帧大小 — STC32G 必须设置为 4 字节（启用 INTR2），勾选后中断处理才能正常运行。"
-        },
-        "stc-extension.c251UseOnChipRom": {
-          "type": "boolean",
-          "default": true,
-          "description": "使用片上 ROM (Use On-chip Code ROM) — STC32G 代码默认从内部 Flash 启动。启用后映射外部 ROM，一般工程无需开启。"
-        },
-        "stc-extension.c251FarAsHugePointer": {
-          "type": "boolean",
-          "default": false,
-          "description": "将 far 指针视为 huge 指针 (Treat far pointer as huge pointer) — far 指针默认已支持 24 位寻址，启用后会增加代码体积，无特殊需求无需开启。"
-        },
-        "stc-extension.c251UnsignedChar": {
-          "type": "boolean",
-          "default": false,
-          "description": "将 plain char 视为 unsigned char (Treat plain char as 'unsigned char') — 启用后 C251 控制字添加 UNSIGNED_CHAR。"
-        },
-        "stc-extension.l251WarningLevel": {
-          "type": "string",
-          "default": "DEFAULT",
-          "enum": [
-            "DEFAULT",
-            "0",
-            "1",
-            "2"
-          ],
-          "enumDescriptions": [
-            "默认 — 不生成 WARNINGLEVEL 指令",
-            "Warninglevel 0 — 禁用警告 | Disable warnings",
-            "Warninglevel 1 — 警告级别 1",
-            "Warninglevel 2 — 警告级别 2 (显示最多警告)"
-          ],
-          "description": "L251 链接器警告级别 (Linker Warning Level)"
-        },
-        "stc-extension.l251DisableWarnings": {
-          "type": "string",
-          "default": "57,16",
-          "description": "L251 屏蔽的链接器警告编号 (Disable Warning Numbers) — 如 57(UNCALLED FUNCTION), 16(UNCALLED SEGMENT)，多个编号用逗号分隔。"
-        },
-        "stc-extension.l251UseMemoryLayout": {
-          "type": "boolean",
-          "default": true,
-          "description": "使用 Target Dialog 中的内存布局 (Use Memory Layout from Target Dialog) — 启用后根据 uvproj 中配置的片上内存生成 CLASSES 指令。"
-        },
-        "stc-extension.hexFormat": {
-          "type": "string",
-          "default": "HEX-386",
-          "enum": [
-            "HEX-80",
-            "HEX-386"
-          ],
-          "enumDescriptions": [
-            "Intel HEX-80 — 标准 8/16 位地址格式",
-            "Intel HEX-386 — 32 位扩展地址格式，STC32G (80251 内核) 推荐"
-          ],
-          "description": "OH251 生成的 Intel HEX 文件格式。STC32G 使用 80251 扩展指令集，推荐使用 HEX-386 以支持 32 位地址空间。"
-        },
-        "stc-extension.listingPageWidth": {
-          "type": "integer",
-          "default": 120,
-          "minimum": 72,
-          "maximum": 256,
-          "description": "列表文件页宽 (Page Width) — 控制 .lst/.map 等列表文件的每行字符数，方便打印/阅读。"
-        },
-        "stc-extension.listingPageLength": {
-          "type": "integer",
-          "default": 65,
-          "minimum": 10,
-          "maximum": 200,
-          "description": "列表文件页长 (Page Length) — 控制 .lst/.map 等列表文件的每页行数。"
-        },
-        "stc-extension.c251ListingEnabled": {
-          "type": "boolean",
-          "default": true,
-          "description": "C 编译器列表 (C Compiler Listing) — 启用后生成 .lst 编译列表文件，包含 C 代码、条件编译展开、符号表、汇编输出等。"
-        },
-        "stc-extension.c251ListingOptions": {
-          "type": "string",
-          "default": "COND",
-          "markdownDescription": "C 编译器列表选项 (C Compiler Listing Options) — 空格分隔的控制字：\n\n- `COND` — 显示条件编译 (`#ifdef`/`#if`) 展开\n- `SYMBOLS` — 包含变量/函数符号表\n- `INCLUDE` — 包含头文件展开内容\n- `CODE` — 显示 C 代码对应的汇编输出\n- `NOCOND` / `NOSYMBOLS` / `NOINCLUDE` / `NOCODE` — 关闭对应选项\n\n默认: `COND`"
-        },
-        "stc-extension.c251PreprintEnabled": {
-          "type": "boolean",
-          "default": false,
-          "description": "C 预处理器列表 (C Preprocessor Listing) — 启用后生成 .i 预处理输出文件，包含宏展开、头文件合并、条件编译后的结果，适合排查宏定义问题。"
-        },
-        "stc-extension.a251ListingEnabled": {
-          "type": "boolean",
-          "default": true,
-          "description": "汇编器列表 (Assembler Listing) — 启用后生成 .lst 汇编列表文件。"
-        },
-        "stc-extension.a251ListingOptions": {
-          "type": "string",
-          "default": "COND SYMBOLS",
-          "markdownDescription": "汇编器列表选项 (Assembler Listing Options) — 空格分隔的控制字：\n\n- `COND` — 显示汇编条件指令 (`IF`/`IFDEF`) 展开\n- `SYMBOLS` — 包含汇编符号表 (标号、变量)\n- `MACRO` — 显示宏展开的最终代码\n- `MACROALL` — 显示宏展开的全部过程\n- `XREF` — 生成符号交叉引用表\n\n默认: `COND SYMBOLS`"
-        },
-        "stc-extension.l251MapEnabled": {
-          "type": "boolean",
-          "default": true,
-          "description": "链接器列表 / Map 文件 (Linker Listing) — 启用后生成 .map 内存映射文件。"
-        },
-        "stc-extension.l251MapOptions": {
-          "type": "string",
-          "default": "MAP PUBLICS LOCALS LINES COMMENTS GENSYM LIBRARY",
-          "markdownDescription": "链接器 Map 文件选项 — 空格分隔的控制字：\n\n- `MAP` — 生成内存分布映射 (代码段/数据段/BSS 地址和大小)\n- `PUBLICS` — 包含全局符号地址信息\n- `LOCALS` — 包含静态/局部符号地址信息\n- `LINES` — 生成地址与源码行号对应关系\n- `COMMENTS` — 包含链接过程注释信息\n- `GENSYM` — 包含链接器自动生成的符号\n- `LIBRARY` — 包含库文件中被引用的符号\n- `XREF` — 生成符号交叉引用表\n\n默认: `MAP PUBLICS LOCALS LINES COMMENTS GENSYM LIBRARY`"
-        },
-        "stc-extension.l251CodeListingEnabled": {
-          "type": "boolean",
-          "default": false,
-          "description": "链接器代码列表 (Linker Code Listing) — 启用后生成 .cod 文件，包含链接后的完整机器码和汇编指令，可用于逆向分析或优化。"
-        },
-        "stc-extension.a251DebugInfo": {
-          "type": "boolean",
-          "default": true,
-          "description": "A251 调试信息 (Debug Info) — 在目标文件中包含调试信息，用于源码级调试。"
-        },
-        "stc-extension.a251ExtendedProcessing": {
-          "type": "boolean",
-          "default": true,
-          "description": "A251 扩展处理 (EP / Extended Processing) — 启用 80251 扩展指令集处理，STC32G 必须开启。"
-        },
-        "stc-extension.a251MacroProcessor": {
-          "type": "string",
-          "default": "STANDARD",
-          "enum": [
-            "STANDARD",
-            "MPL",
-            "OFF"
-          ],
-          "enumDescriptions": [
-            "Standard — 标准宏处理器，支持常规汇编宏指令 (默认)",
-            "MPL — 高级宏处理模式，提供更复杂的宏功能",
-            "OFF — 禁用宏处理器"
-          ],
-          "description": "A251 宏处理器 (Macro Processor) — 控制汇编宏的处理方式。"
-        },
-        "stc-extension.a251CaseSensitive": {
-          "type": "boolean",
-          "default": false,
-          "description": "A251 区分大小写符号 (Case sensitive symbols) — 默认不区分大小写，与 Keil 汇编器行为一致。"
-        },
-        "stc-extension.a251ModSrc": {
-          "type": "boolean",
-          "default": true,
-          "description": "A251 修改源列表 (MODSRC) — 生成修改后的源文件列表，用于调试汇编过程。"
-        },
-        "stc-extension.a251Misc": {
-          "type": "string",
-          "default": "",
-          "markdownDescription": "A251 额外汇编器控制参数（附加到控制字符串末尾）\n\n如 `INCDIR(..\\..\\libraries\\zf_common) SET(LARGE)`"
+          "stc-extension.listingPageWidth": {
+            "type": "integer",
+            "default": 120,
+            "minimum": 72,
+            "maximum": 256,
+            "description": "列表文件页宽 (Page Width) — 控制 .lst/.map 等列表文件的每行字符数，方便打印/阅读。"
+          },
+          "stc-extension.listingPageLength": {
+            "type": "integer",
+            "default": 65,
+            "minimum": 10,
+            "maximum": 200,
+            "description": "列表文件页长 (Page Length) — 控制 .lst/.map 等列表文件的每页行数。"
+          }
+        }
+      },
+      {
+        "id": "stc-extension.c251",
+        "title": "C251",
+        "order": 20,
+        "properties": {
+          "stc-extension.c251OptimizeLevel": {
+            "type": "string",
+            "default": "0",
+            "enum": [
+              "DEFAULT",
+              "0",
+              "1",
+              "2",
+              "3",
+              "4",
+              "5",
+              "6",
+              "7",
+              "8",
+              "9"
+            ],
+            "enumDescriptions": [
+              "默认 — 使用编译器默认优化级别",
+              "Level 0: 常量折叠 | Constant folding",
+              "Level 1: + 死代码消除 | Dead code elimination",
+              "Level 2: + 访问优化 | Access optimization",
+              "Level 3: + 寄存器变量优化 | Register variables",
+              "Level 4: + 公共子表达式消除 | Common subexpression elimination",
+              "Level 5: + 局部死变量消除 | Dead local variable elimination",
+              "Level 6: + 常量传播 | Constant propagation",
+              "Level 7: + 公共尾代码合并 | Common tail merging",
+              "Level 8: + 公共块子程序打包 | Common block subroutine packing",
+              "Level 9: + 代码重排以最大化公共块 | Rearrange Code to maximize Common Blocks"
+            ],
+            "description": "C251 代码优化级别"
+          },
+          "stc-extension.c251OptimizeEmphasis": {
+            "type": "string",
+            "default": "SPEED",
+            "enum": [
+              "SPEED",
+              "SIZE"
+            ],
+            "enumDescriptions": [
+              "优先优化执行速度 | Favor execution speed",
+              "优先优化代码体积 | Favor code size"
+            ],
+            "description": "C251 优化侧重"
+          },
+          "stc-extension.c251AliasChecking": {
+            "type": "boolean",
+            "default": true,
+            "description": "指针访问的别名检查 | Alias checking on pointer accesses — 关闭则生成 NOALIAS"
+          },
+          "stc-extension.c251MemoryModel": {
+            "type": "string",
+            "default": "LARGE",
+            "enum": [
+              "SMALL",
+              "XSMALL",
+              "COMPACT",
+              "LARGE"
+            ],
+            "enumDescriptions": [
+              "SMALL — 变量默认在 data 区，指针 2 字节",
+              "XSMALL — 变量默认在 data 区，指针 4 字节",
+              "COMPACT — 变量默认在 pdata 区，指针 2 字节",
+              "LARGE — 变量默认在 xdata 区，指针 4 字节 (推荐 STC32G)"
+            ],
+            "description": "C251 内存模型 (Memory Model) — STC32G 推荐 LARGE 模式，变量默认分配到 xdata 区，指针为 4 字节（24 位地址），适配其大容量 RAM。"
+          },
+          "stc-extension.c251WarningLevel": {
+            "type": "string",
+            "default": "3",
+            "enum": [
+              "DEFAULT",
+              "0",
+              "1",
+              "2",
+              "3"
+            ],
+            "enumDescriptions": [
+              "默认 — 不生成 WARNINGLEVEL 指令",
+              "Warninglevel 0 — 禁用警告 | Disable warnings",
+              "Warninglevel 1 — 警告级别 1",
+              "Warninglevel 2 — 警告级别 2",
+              "Warninglevel 3 — 警告级别 3"
+            ],
+            "description": "C251 警告级别"
+          },
+          "stc-extension.c251IncludePaths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": [],
+            "markdownDescription": "C251 头文件包含路径 (相当于 Keil `INCDIR(...)`)\n\n支持相对路径（相对于工作区根目录）"
+          },
+          "stc-extension.c251Defines": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": [
+              "STC32G12K128"
+            ],
+            "markdownDescription": "C251 预定义宏 (相当于 Keil `DEFINE(...)`)"
+          },
+          "stc-extension.c251PuMode": {
+            "type": "string",
+            "default": "SOURCE",
+            "enum": [
+              "SOURCE",
+              "BINARY"
+            ],
+            "enumDescriptions": [
+              "Source (251 native) — STC32G 推荐模式，生成 C251 原生指令集代码，支持 24 位地址和扩展特性",
+              "Binary (MODBIN) — 二进制兼容模式，兼容传统 8051 指令集，功能受限"
+            ],
+            "description": "PU 模式 | C251 指令模式 — STC32G 必须使用 Source 模式，若选 Binary 模式会导致功能受限。"
+          },
+          "stc-extension.c251XtalFrequency": {
+            "type": "number",
+            "default": 35,
+            "description": "系统时钟频率 (MHz) — 参考值，不自动注入宏定义。请在代码中使用 #define MAIN_Fosc 自行定义。此参数用于文档记录，建议修改为实际使用的频率（如 24.0 或 30.0 MHz）。"
+          },
+          "stc-extension.c251CodeRomSize": {
+            "type": "string",
+            "default": "LARGE",
+            "enum": [
+              "SMALL",
+              "COMPACT",
+              "MEDIUM",
+              "LARGE",
+              "HUGE"
+            ],
+            "enumDescriptions": [
+              "SMALL — 最大 2KB 程序空间",
+              "COMPACT — 最大 64KB 程序空间",
+              "MEDIUM — 任意大小，使用 AJMP/ACALL 指令",
+              "LARGE — 任意大小，使用 LJMP/LCALL 指令 (推荐 STC32G 前 64KB Flash)",
+              "HUGE — 任意大小，使用 EJMP/ECALL 指令 (需配合 Code Banking 使用超过 64KB 的代码空间)"
+            ],
+            "description": "Code Rom Size | 代码 ROM 大小模式 — 适配 STC32G128KB Flash 的前 64KB 空间，如需使用超过 64KB 的代码空间，可配合 Code Banking 选择 HUGE。"
+          },
+          "stc-extension.c251InterruptFrameSize": {
+            "type": "integer",
+            "default": 4,
+            "enum": [
+              0,
+              4
+            ],
+            "enumDescriptions": [
+              "默认中断帧 — 不使用 INTR2",
+              "4 字节中断帧 (INTR2) — C251 架构中断函数默认需要 4 字节的栈帧，是 STC32G 的强制配置"
+            ],
+            "description": "4 Byte Interrupt Frame Size | 中断帧大小 — STC32G 必须设置为 4 字节（启用 INTR2），勾选后中断处理才能正常运行。"
+          },
+          "stc-extension.c251UseOnChipRom": {
+            "type": "boolean",
+            "default": true,
+            "description": "使用片上 ROM (Use On-chip Code ROM) — STC32G 代码默认从内部 Flash 启动。启用后映射外部 ROM，一般工程无需开启。"
+          },
+          "stc-extension.c251FarAsHugePointer": {
+            "type": "boolean",
+            "default": false,
+            "description": "将 far 指针视为 huge 指针 (Treat far pointer as huge pointer) — far 指针默认已支持 24 位寻址，启用后会增加代码体积，无特殊需求无需开启。"
+          },
+          "stc-extension.c251UnsignedChar": {
+            "type": "boolean",
+            "default": false,
+            "description": "将 plain char 视为 unsigned char (Treat plain char as 'unsigned char') — 启用后 C251 控制字添加 UNSIGNED_CHAR。"
+          },
+          "stc-extension.c251Misc": {
+            "type": "string",
+            "default": "",
+            "markdownDescription": "C251 额外编译器控制参数（附加到控制字符串末尾）\n\n如 `INTR2 DEBUG PRINT(.\\Out_File\\*.lst)`"
+          },
+          "stc-extension.c251ListingEnabled": {
+            "type": "boolean",
+            "default": true,
+            "description": "C 编译器列表 (C Compiler Listing) — 启用后生成 .lst 编译列表文件，包含 C 代码、条件编译展开、符号表、汇编输出等。"
+          },
+          "stc-extension.c251ListingOptions": {
+            "type": "string",
+            "default": "COND",
+            "markdownDescription": "C 编译器列表选项 (C Compiler Listing Options) — 空格分隔的控制字：\n\n- `COND` — 显示条件编译 (`#ifdef`/`#if`) 展开\n- `SYMBOLS` — 包含变量/函数符号表\n- `INCLUDE` — 包含头文件展开内容\n- `CODE` — 显示 C 代码对应的汇编输出\n- `NOCOND` / `NOSYMBOLS` / `NOINCLUDE` / `NOCODE` — 关闭对应选项\n\n默认: `COND`"
+          },
+          "stc-extension.c251PreprintEnabled": {
+            "type": "boolean",
+            "default": false,
+            "description": "C 预处理器列表 (C Preprocessor Listing) — 启用后生成 .i 预处理输出文件，包含宏展开、头文件合并、条件编译后的结果，适合排查宏定义问题。"
+          }
+        }
+      },
+      {
+        "id": "stc-extension.a251",
+        "title": "A251",
+        "order": 30,
+        "properties": {
+          "stc-extension.a251DebugInfo": {
+            "type": "boolean",
+            "default": true,
+            "description": "A251 调试信息 (Debug Info) — 在目标文件中包含调试信息，用于源码级调试。"
+          },
+          "stc-extension.a251ExtendedProcessing": {
+            "type": "boolean",
+            "default": true,
+            "description": "A251 扩展处理 (EP / Extended Processing) — 启用 80251 扩展指令集处理，STC32G 必须开启。"
+          },
+          "stc-extension.a251MacroProcessor": {
+            "type": "string",
+            "default": "STANDARD",
+            "enum": [
+              "STANDARD",
+              "MPL",
+              "OFF"
+            ],
+            "enumDescriptions": [
+              "Standard — 标准宏处理器，支持常规汇编宏指令 (默认)",
+              "MPL — 高级宏处理模式，提供更复杂的宏功能",
+              "OFF — 禁用宏处理器"
+            ],
+            "description": "A251 宏处理器 (Macro Processor) — 控制汇编宏的处理方式。"
+          },
+          "stc-extension.a251CaseSensitive": {
+            "type": "boolean",
+            "default": false,
+            "description": "A251 区分大小写符号 (Case sensitive symbols) — 默认不区分大小写，与 Keil 汇编器行为一致。"
+          },
+          "stc-extension.a251ModSrc": {
+            "type": "boolean",
+            "default": true,
+            "description": "A251 修改源列表 (MODSRC) — 生成修改后的源文件列表，用于调试汇编过程。"
+          },
+          "stc-extension.a251ListingEnabled": {
+            "type": "boolean",
+            "default": true,
+            "description": "汇编器列表 (Assembler Listing) — 启用后生成 .lst 汇编列表文件。"
+          },
+          "stc-extension.a251ListingOptions": {
+            "type": "string",
+            "default": "COND SYMBOLS",
+            "markdownDescription": "汇编器列表选项 (Assembler Listing Options) — 空格分隔的控制字：\n\n- `COND` — 显示汇编条件指令 (`IF`/`IFDEF`) 展开\n- `SYMBOLS` — 包含汇编符号表 (标号、变量)\n- `MACRO` — 显示宏展开的最终代码\n- `MACROALL` — 显示宏展开的全部过程\n- `XREF` — 生成符号交叉引用表\n\n默认: `COND SYMBOLS`"
+          },
+          "stc-extension.a251Misc": {
+            "type": "string",
+            "default": "",
+            "markdownDescription": "A251 额外汇编器控制参数（附加到控制字符串末尾）\n\n如 `INCDIR(..\\..\\libraries\\zf_common) SET(LARGE)`"
+          }
+        }
+      },
+      {
+        "id": "stc-extension.l251",
+        "title": "L251",
+        "order": 40,
+        "properties": {
+          "stc-extension.l251WarningLevel": {
+            "type": "string",
+            "default": "DEFAULT",
+            "enum": [
+              "DEFAULT",
+              "0",
+              "1",
+              "2"
+            ],
+            "enumDescriptions": [
+              "默认 — 不生成 WARNINGLEVEL 指令",
+              "Warninglevel 0 — 禁用警告 | Disable warnings",
+              "Warninglevel 1 — 警告级别 1",
+              "Warninglevel 2 — 警告级别 2 (显示最多警告)"
+            ],
+            "description": "L251 链接器警告级别 (Linker Warning Level)"
+          },
+          "stc-extension.l251DisableWarnings": {
+            "type": "string",
+            "default": "57,16",
+            "description": "L251 屏蔽的链接器警告编号 (Disable Warning Numbers) — 如 57(UNCALLED FUNCTION), 16(UNCALLED SEGMENT)，多个编号用逗号分隔。"
+          },
+          "stc-extension.l251UseMemoryLayout": {
+            "type": "boolean",
+            "default": true,
+            "description": "使用 Target Dialog 中的内存布局 (Use Memory Layout from Target Dialog) — 启用后根据 uvproj 中配置的片上内存生成 CLASSES 指令。"
+          },
+          "stc-extension.l251MapEnabled": {
+            "type": "boolean",
+            "default": true,
+            "description": "链接器列表 / Map 文件 (Linker Listing) — 启用后生成 .map 内存映射文件。"
+          },
+          "stc-extension.l251MapOptions": {
+            "type": "string",
+            "default": "MAP PUBLICS LOCALS LINES COMMENTS GENSYM LIBRARY",
+            "markdownDescription": "链接器 Map 文件选项 — 空格分隔的控制字：\n\n- `MAP` — 生成内存分布映射 (代码段/数据段/BSS 地址和大小)\n- `PUBLICS` — 包含全局符号地址信息\n- `LOCALS` — 包含静态/局部符号地址信息\n- `LINES` — 生成地址与源码行号对应关系\n- `COMMENTS` — 包含链接过程注释信息\n- `GENSYM` — 包含链接器自动生成的符号\n- `LIBRARY` — 包含库文件中被引用的符号\n- `XREF` — 生成符号交叉引用表\n\n默认: `MAP PUBLICS LOCALS LINES COMMENTS GENSYM LIBRARY`"
+          },
+          "stc-extension.l251CodeListingEnabled": {
+            "type": "boolean",
+            "default": false,
+            "description": "链接器代码列表 (Linker Code Listing) — 启用后生成 .cod 文件，包含链接后的完整机器码和汇编指令，可用于逆向分析或优化。"
+          }
         }
       }
-    },
+    ],
     "taskDefinitions": [
       {
         "type": "stc-build",
